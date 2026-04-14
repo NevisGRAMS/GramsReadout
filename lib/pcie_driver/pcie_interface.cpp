@@ -104,6 +104,19 @@ namespace pcie_int {
 
         constexpr uint32_t vendor_id = GRAMSREADOUT_DEFAULT_VENDOR_ID;
 
+        /* What is slot_id??
+         * This is the slot number assigned by the Winddriver driver. This is printed out when
+         * the software is configured and the GRAMSREADOUT_DeviceOpen() is called.
+         * The driver searches the PCIe bus for all devices with the specified ID. If there are multiple
+         * devices with the same ID it lists all these devices and numbers them from 1..N and stores them
+         * in an array. Originally the driver asked for user input to select the device but this obviously
+         * must be automated so we set it in the config file using slot_id_x where x = 1 or 2. Slot 1 selects
+         * the first element in the array, 2 the second element, up to N.
+         *
+         * Note: If the device ID is unique for both PCIe cards, the slot_id can be skipped and it will select
+         * the first PCIe card with that ID which should be the correct one.
+         */
+
         dev_handle_1 = GRAMSREADOUT_DeviceOpen(vendor_id, dev1, slot_id_0);
         dev_handle_2 = GRAMSREADOUT_DeviceOpen(vendor_id, dev2, slot_id_1);
 
