@@ -364,7 +364,7 @@ void PollServiceState(sd_bus* bus, quill::Logger *logger) {
         if (r < 0) {
             QUILL_LOG_ERROR(logger, "[{}] ERROR: {}", service, error.message);
         } else {
-            QUILL_LOG_INFO(logger, "[{}] [{}]", service, state.get());
+            //QUILL_LOG_INFO(logger, "[{}] [{}]", service, state.get());
             bool is_service_active = std::string_view(state.get()) == "active";
             if (service == "tpc_daq.service") {
                 g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc, !is_service_active);
@@ -541,42 +541,32 @@ void DAQHandler(std::shared_ptr<TCPConnection> &command_client_ptr, std::shared_
             }
             case to_u16(CommunicationCodes::ORC_Boot_All_DAQ): {
                 ControlService(kTpcDaq, kStartUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc);
                 ControlService(kTofDaq, kStartUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tof);
                 ControlService(kDataMonitor, kStartUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc_monitor);
                 QUILL_LOG_INFO(logger, "Booted All DAQ...");
                 break;
             }
             case to_u16(CommunicationCodes::ORC_Shutdown_All_DAQ): {
                 ControlService(kTpcDaq, kStopUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc, true);
                 ControlService(kTofDaq, kStopUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tof, true);
                 ControlService(kDataMonitor, kStopUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc_monitor, true);
                 QUILL_LOG_INFO(logger, "Shutdown All DAQ...");
                 break;
             }
             case to_u16(CommunicationCodes::ORC_Boot_Tpc_Daq): {
                 ControlService(kTpcDaq, kStartUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc);
                 break;
             }
             case to_u16(CommunicationCodes::ORC_Shutdown_Tpc_Daq): { 
                 ControlService(kTpcDaq, kStopUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc, true);
                 break;
             }
             case to_u16(CommunicationCodes::ORC_Boot_Tof_Daq): { 
                 ControlService(kTofDaq, kStartUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tof);
                 QUILL_LOG_INFO(logger, "Booted TOF DAQ...");
                 break;
             } case to_u16(CommunicationCodes::ORC_Shutdown_Tof_Daq): { 
                 ControlService(kTofDaq, kStopUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tof, true);
                 QUILL_LOG_INFO(logger, "Shutdown TOF DAQ...");
                 break;
             }
@@ -588,22 +578,16 @@ void DAQHandler(std::shared_ptr<TCPConnection> &command_client_ptr, std::shared_
             } case to_u16(CommunicationCodes::ORC_Exec_CPU_Restart): {
                 // Make sure all DAQ are shutdown first
                 ControlService(kTpcDaq, kStopUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc, true);
                 ControlService(kTofDaq, kStopUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tof, true);
                 ControlService(kDataMonitor, kStopUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc_monitor, true);
                 QUILL_LOG_INFO(logger, "Rebooting DAQ Computer!");
                 RebootComputer();
                 break;
             } case to_u16(CommunicationCodes::ORC_Exec_CPU_Shutdown): {
                 // Make sure all DAQ are shutdown first
                 ControlService(kTpcDaq, kStopUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc, true);
                 ControlService(kTofDaq, kStopUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tof, true);
                 ControlService(kDataMonitor, kStopUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc_monitor, true);
                 QUILL_LOG_INFO(logger, "Shutting down DAQ Computer!");
                 // ShutdownComputer();
                 break;
@@ -613,11 +597,9 @@ void DAQHandler(std::shared_ptr<TCPConnection> &command_client_ptr, std::shared_
                 break;
             } case to_u16(CommunicationCodes::ORC_Boot_Monitor): {
                 ControlService(kDataMonitor, kStartUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc_monitor);
                 break;
             } case to_u16(CommunicationCodes::ORC_Shutdown_Monitor): {
                 ControlService(kDataMonitor, kStopUnit, logger);
-                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc_monitor, true);
                 break;
             } case to_u16(CommunicationCodes::ORC_Start_PPS): { // Init AD3 and start PPS
                 int ret = std::system("ad3_ctrl 1");
