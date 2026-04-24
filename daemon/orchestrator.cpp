@@ -57,6 +57,18 @@ const std::string kStopUnit = "StopUnit";
 // --- Global Variables ---
 namespace pgrams::orchestrator { // Use anonymous namespace for internal linkage
 
+// Custom deleter for strings allocated by systemd to get the service status
+struct CFreeDeleter {
+    void operator()(void* p) const { free(p); }
+};
+using SystemdString = std::unique_ptr<char, CFreeDeleter>;
+
+// Custom deleter for the main sd_bus connection
+struct BusDeleter {
+    void operator()(sd_bus* bus) const { sd_bus_flush_close_unref(bus); }
+};
+using BusPtr = std::unique_ptr<sd_bus, BusDeleter>;
+
 using namespace communication;
 
 std::atomic_bool g_running(true);
@@ -312,10 +324,76 @@ void GetComputerStatus(quill::Logger *logger) {
     }
 }
 
+void PollServiceState(sd_bus* bus, quill::Logger *logger) {
+    // The services to monitor
+    const std::vector<std::string> services = {
+        "tpc_daq.service",
+        "tof_daq.service",
+        "data_monitor.service"
+    };
+
+    for (const auto& service : services) {
+        char* raw_escaped_path = nullptr;
+        sd_bus_error error = SD_BUS_ERROR_NULL;
+
+        // 1. Encode the path
+        int r = sd_bus_path_encode("/org/freedesktop/systemd1/unit", service.c_str(), &raw_escaped_path);
+        if (r < 0) {
+            QUILL_LOG_ERROR(logger, "[{}] Failed to encode path.", service);
+            continue;
+        }
+
+        // Take immediate ownership of the allocated string so it is safely freed later
+        SystemdString escaped_path(raw_escaped_path);
+
+        char* raw_state = nullptr;
+
+        // 2. Query the property
+        r = sd_bus_get_property_string(
+            bus,
+            "org.freedesktop.systemd1",
+            escaped_path.get(),
+            "org.freedesktop.systemd1.Unit",
+            "ActiveState", // active,inactive,activating,failed,deactivating,failed,reloading
+            &error,
+            &raw_state
+        );
+        // Take ownership of the returned state string with a memory safe container
+        SystemdString state(raw_state);
+        // 3. Handle the result
+        if (r < 0) {
+            QUILL_LOG_ERROR(logger, "[{}] ERROR: {}", service, error.message);
+        } else {
+            QUILL_LOG_INFO(logger, "[{}] [{}]", service, state.get());
+            bool is_service_active = std::string_view(state.get()) == "active";
+            if (service == "tpc_daq.service") {
+                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc, !is_service_active);
+            } else if (service == "tof_daq.service") {
+                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tof, !is_service_active);
+            }
+            else if (service == "data_monitor.service") {
+                g_daq_monitor.setDaqBitWord(DaqCompMonitor::tpc_monitor, !is_service_active);
+            }
+        }
+        sd_bus_error_free(&error);
+    }
+}
+
 void SendStatus(std::shared_ptr<TCPConnection> &status_client_ptr, quill::Logger *logger) {
+    // First open the systemd bus so we don't need to do it for every query
+    sd_bus* raw_bus = nullptr;
+    int r = sd_bus_open_system(&raw_bus);
+    if (r < 0) {
+        std::cerr << "Failed to connect to system bus: " << strerror(-r) << "\n";
+        return;
+    }
+    // Wrap the bus pointer safely so it is unreferenced when main() exits
+    BusPtr bus(raw_bus);
+
     while (g_status_running.load()) {
         QUILL_LOG_INFO(logger, "Sending status...");
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        PollServiceState(bus.get(), logger);
         GetComputerStatus(logger); // returns vector of 0's on failure
         auto status = g_daq_monitor.serialize();
         status_client_ptr->WriteSendBuffer(to_telem_u16(TelemetryCodes::ORC_Hardware_Status), status);
