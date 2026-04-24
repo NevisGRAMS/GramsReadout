@@ -107,10 +107,10 @@ namespace light_fem {
             beam_thres = config["light_fem"]["beam_summed_adc_thresh"].get<int>();
             beam_mult = config["light_fem"]["beam_multiplicity"].get<int>();
 
-            en_top = 0xFF; //config["light_fem"]["pmt_enable_top"].get<uint32_t>();
-            en_upper = 0xFF00; //config["light_fem"]["pmt_enable_middle"].get<uint32_t>();
-            en_lower = 0xFFFF; //config["light_fem"]["pmt_enable_lower"].get<uint32_t>();
-            pmt_blocksize = 0xFFFF; //config["light_fem"]["pmt_blocksize"].get<uint32_t>();
+            en_top = config["light_fem"]["pmt_enable_top"].get<uint32_t>();
+            en_upper = config["light_fem"]["pmt_enable_middle"].get<uint32_t>();
+            en_lower = config["light_fem"]["pmt_enable_lower"].get<uint32_t>();
+            pmt_blocksize = config["light_fem"]["pmt_blocksize"].get<uint32_t>();
         } catch (const std::exception &e) {
             LOG_ERROR(logger_, "Failed to read config with error {}", e.what());
             return TpcReadoutMonitor::ErrorBits::lightfem_get_config;
