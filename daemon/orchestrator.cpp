@@ -48,11 +48,13 @@ const uint16_t kDaemonCommandPort = 50001; // Daemon software port, for commands
 const uint16_t kDaemonStatusPort = 50000; // Daemon software port, for status
 
 // Daemon control constants
+const std::string kOrchestrator = "orchestrator.service";
 const std::string kTpcDaq = "tpc_daq.service";
 const std::string kDataMonitor = "data_monitor.service";
 const std::string kTofDaq = "tof_daq.service";
 const std::string kStartUnit = "StartUnit";
 const std::string kStopUnit = "StopUnit";
+const std::string kRestartUnit = "RestartUnit";
 
 // --- Global Variables ---
 namespace pgrams::orchestrator { // Use anonymous namespace for internal linkage
@@ -623,6 +625,10 @@ void DAQHandler(std::shared_ptr<TCPConnection> &command_client_ptr, std::shared_
                     QUILL_LOG_ERROR(logger, "Stopping PPS and pusle train error, return value: {} \n", ret);
                 }
                 QUILL_LOG_INFO(logger, "Stopped PPS and pulse train... \n");
+                break;
+            } case to_u16(CommunicationCodes::ORC_Restart_Orchestrator): {
+                // FIXME should Stop be sent to all child services before restart?
+                ControlService(kOrchestrator, kRestartUnit, logger);
                 break;
             }
             default: {
