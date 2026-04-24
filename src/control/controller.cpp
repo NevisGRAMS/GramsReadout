@@ -192,9 +192,10 @@ namespace controller {
         return true;
     }
 
-    json Controller::SetConfigFromComm(json& config, std::vector<uint32_t> &config_vec, size_t skip_words) {
+    json Controller::SetConfigFromComm(json& config, std::vector<uint32_t> &config_vec) {
+
         try {
-            tpc_configs_.deserialize(config_vec.begin()+skip_words, config_vec.end());
+            tpc_configs_.deserialize(config_vec.begin(), config_vec.end());
             LOG_INFO(logger_, "Config serialized.. {} params \n", config_vec.size());
         } catch (const std::exception& e) {
             LOG_ERROR(logger_, "Error serializing config.. {}", e.what());
@@ -224,13 +225,22 @@ namespace controller {
             std::vector<uint32_t> sipm_deadtime(TOTAL_LIGHT_CHANNELS, tpc_configs_.getRoiDeadtime());
             config["light_fem"]["sipm_deadtime"]            = sipm_deadtime;
 
-            config["light_fem"]["pmt_gate_size"]            = tpc_configs_.getPmtGateSize();
-            config["light_fem"]["pmt_beam_size"]            = tpc_configs_.getPmtBeamSize();
+            config["light_fem"]["pmt_gate_size"]            = tpc_configs_.getUnbiasedLightSamples();
+            config["light_fem"]["pmt_beam_size"]            = tpc_configs_.getUnbiasedLightSamples();
             config["light_fem"]["pmt_blocksize"]            = tpc_configs_.getFifoBlocksize();
 
             // thresholds (just first channel as scalar)
+            // There is a detail here, we only use 36 SiPM channels but there are 40 total light channels 
+            // (>36 are for gates,etc; not for data). We don't want to send these extra params so we add
+            // them separately here. So we set the first 36 thresholds and then add the 4 extra channels.
             config["light_fem"]["channel_thresh0"]          = tpc_configs_.getDiscThreshold0();
             config["light_fem"]["channel_thresh1"]          = tpc_configs_.getDiscThreshold1();
+            // Add the extra channels
+            size_t extra_channels = TOTAL_LIGHT_CHANNELS - config["light_fem"]["channel_thresh0"].size();
+            for (size_t i = 0; i < extra_channels; i++) { 
+                config["light_fem"]["channel_thresh0"].push_back(4096);
+                config["light_fem"]["channel_thresh1"].push_back(4096);
+            }
 
             // trigger
             config["trigger"]["trigger_source"]             = tpc_configs_.toTriggerSourceString(tpc_configs_.getTriggerSource());
@@ -272,7 +282,13 @@ namespace controller {
             return false;
         }
 
-        // Load requested config file
+        /* Load requested config file
+        *  We assume the first element is the file number.
+        *  The local config is loaded first then updated with the config parameters sent from the ground.
+        *  This is done to minimize the number of parameters which need to be sent but means we have to
+        *  hardcode an asssumption about where the config_file_number is located in the 32b array.
+        */
+
         std::string config_file = readout_basedir_ + "/tpc_configs/data_config/test_" + std::to_string(args.at(0)) + ".json";
         LOG_INFO(logger_, "Loading config {}", config_file);
         config_ = LoadConfig(config_file);
@@ -283,8 +299,7 @@ namespace controller {
 
         if (args.size() > 1) {
             LOG_INFO(logger_, "Setting config from ground comms \n");
-            size_t skip_words = 1;
-            config_ = SetConfigFromComm(config_, args, skip_words);
+            config_ = SetConfigFromComm(config_, args);
             if (config_.is_null()) {
                 return false;
             }
@@ -350,7 +365,7 @@ namespace controller {
             return false;
         }
 
-        LOG_INFO(logger_, "Config dump: {} \n", config_.dump());
+        LOG_INFO(logger_, "Setting system with Config: {} \n", config_.dump());
 
         LOG_INFO(logger_, "PCIe devices initialized!");
         LOG_INFO(logger_, "Initializing hardware...");
@@ -477,7 +492,7 @@ namespace controller {
     void Controller::ReceiveCommand() {
         while (is_running_) {
             Command cmd = command_client_->ReadRecvBuffer();
-            std::cout << "Received command: " << cmd.command << std::endl;
+            std::cout << "Received command: " << cmd.command << " #Args=" << cmd.arguments.size() <<  std::endl;
             // command_client_.WriteSendBuffer(cmd); //ack
             bool response = HandleCommand(cmd);
             if (cmd.command == to_u16(CommunicationCodes::COM_HeartBeat)) continue;
