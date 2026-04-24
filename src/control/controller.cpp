@@ -235,11 +235,11 @@ namespace controller {
             // them separately here. So we set the first 36 thresholds and then add the 4 extra channels.
             config["light_fem"]["channel_thresh0"]          = tpc_configs_.getDiscThreshold0();
             config["light_fem"]["channel_thresh1"]          = tpc_configs_.getDiscThreshold1();
-            // Add the extra channels
+            // Add the extra channels, set them to their max threshold 0xFFF=4095
             size_t extra_channels = TOTAL_LIGHT_CHANNELS - config["light_fem"]["channel_thresh0"].size();
             for (size_t i = 0; i < extra_channels; i++) { 
-                config["light_fem"]["channel_thresh0"].push_back(4096);
-                config["light_fem"]["channel_thresh1"].push_back(4096);
+                config["light_fem"]["channel_thresh0"].push_back(0xFFF);
+                config["light_fem"]["channel_thresh1"].push_back(0xFFF);
             }
 
             // trigger
