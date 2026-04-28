@@ -39,6 +39,8 @@ using json = nlohmann::json;
         tpc_monitor.setNumRwBufferOverflow(data_handler_metrics_["num_rw_buffer_overflow"]);
         tpc_monitor.setStartMarker(data_handler_metrics_["event_start_markers"]);
         tpc_monitor.setEndMarker(data_handler_metrics_["event_end_markers"]);
+        tpc_monitor.setEndMarker(data_handler_metrics_["event_end_markers"]);
+        tpc_monitor.setPpsCount(data_handler_metrics_["pps_count"]);
 
         // If the PCIe cards are not initialized we cannot query the hardware.
         // Just set the board status words to 0x0

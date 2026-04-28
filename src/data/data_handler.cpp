@@ -28,7 +28,8 @@ namespace data_handler {
         trig_data_ctr_(0),
         read_write_buff_overflow_(false),
         file_count_(0),
-        stop_write_(false) {
+        stop_write_(false),
+        pps_count_(0) {
         logger_ = quill::Frontend::create_or_get_logger("readout_logger");
     }
 
@@ -48,6 +49,7 @@ namespace data_handler {
         metrics["num_rw_buffer_overflow"] = num_rw_buffer_overflow_.load();
         metrics["event_start_markers"] = event_start_markers_.load();
         metrics["event_end_markers"] = event_end_markers_.load();
+        metrics["pps_count"] = pps_count_.load();
 
         // Since we poll the metrics every dt we can find the average rate
         prev_event_count_ = event_count_.load();
@@ -131,6 +133,8 @@ namespace data_handler {
             pps_sample_period_ = config["data_handler"]["pps_sample_period"].get<int>();
             read_core_id_ = config["data_handler"]["read_core_id"].get<size_t>();
             write_core_id_ = config["data_handler"]["write_core_id"].get<size_t>();
+            drift_size_ = config["readout_windows"]["drift_size"].get<size_t>();
+
             LOG_INFO(logger_, "Trigger source software [{}] external [{}] \n", software_trig_, ext_trig_);
             LOG_DEBUG(logger_, "\t [{}] DMA loops with [{}] 32b words \n", num_dma_loops_, DATABUFFSIZE / 4);
             LOG_INFO(logger_, "\n Writing files: {}", write_file_name_);
@@ -773,7 +777,8 @@ namespace data_handler {
         std::array<uint32_t, 2> read_array{};
         uint32_t *psend = send_array.data();
         uint32_t *precv = read_array.data();
-
+        size_t previous_pps_sample = 0;
+        // PPS register query and data structure
         size_t num_status_words = 2;
         uint32_t chip_num = 3;
         std::array<PPSSample, PPS_BUFFER_SIZE> pps_sample_buffer{};
@@ -800,6 +805,9 @@ namespace data_handler {
             uint32_t pps_div = ( ( read_array.at(1) & 0x70000) >> 16 );
             // Add samples to buffer
             if (pps_frame > 0) {
+                // Calculate the 2MHz timestamp and skip the sample if it has not increased
+                uint32_t run_pps_sample = pps_frame * drift_size_ + pps_sample;
+                if (run_pps_sample <= previous_pps_sample) continue;
                 //LOG_INFO(logger_, "Sample period {} Read Counter {}", pps_sample_period_, read_counter);
                 pps_sample_buffer[read_counter].timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
                                                          std::chrono::system_clock::now().time_since_epoch()).count();
@@ -807,6 +815,8 @@ namespace data_handler {
                 pps_sample_buffer[read_counter].pps_sample = pps_sample;
                 pps_sample_buffer[read_counter].pps_div = pps_div;
                 read_counter++;
+                previous_pps_sample = run_pps_sample;
+                pps_count_++;
             }
 
             if (read_counter >= PPS_BUFFER_SIZE) {
@@ -838,6 +848,7 @@ namespace data_handler {
         num_dma_loops_ = 0;
         num_recv_bytes_ = 0;
         run_error_bit_.store(0); // reset the error word
+        pps_count_.store(0);
 
         // Reset the stop write flag so we can restart
         stop_write_.store(false);

@@ -142,7 +142,8 @@ private:
 
     int fd_;
     quill::Logger* logger_;
-
+    size_t drift_size_;
+    std::atomic<size_t> pps_count_;
     // Struct to read PPS samples (this will be 20B + 4B padding)
     struct PPSSample {
         int64_t timestamp;
