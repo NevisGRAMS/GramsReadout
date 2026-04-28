@@ -40,6 +40,15 @@ using json = nlohmann::json;
         tpc_monitor.setStartMarker(data_handler_metrics_["event_start_markers"]);
         tpc_monitor.setEndMarker(data_handler_metrics_["event_end_markers"]);
 
+        // If the PCIe cards are not initialized we cannot query the hardware.
+        // Just set the board status words to 0x0
+        bool pcie_initialized = pcie_interface->getInitStatus();
+        if (!pcie_initialized) {
+            std::vector<uint32_t>status_vec(boards.size(), 0);
+            tpc_monitor.setBoardStatus(status_vec);
+            return;
+        }
+
         std::vector<uint32_t> status_vec;
         if (minimal_status) {
              uint32_t status_res = 0;

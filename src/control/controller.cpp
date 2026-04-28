@@ -61,17 +61,23 @@ namespace controller {
         pcie_interface_ = std::make_unique<pcie_int::PCIeInterface>();
         buffers_ = std::make_unique<pcie_int::PcieBuffers>();
 
+        // We want to monitor the TPC DAQ as soon as its active
+        // Note: At this point the PCIe cards are not yet open so we cannot query
+        // the hardware status. There is a check so we won't query unopened cards.
+        run_status_.store(true);
+        status_thread_ = std::thread(&Controller::StatusControl, this);
+
         LOG_INFO(logger_, "Initialized Controller \n");
     }
 
     Controller::~Controller() {
         LOG_INFO(logger_, "Destructing Controller \n");
-        // data_monitor::DataMonitor::ResetInstance();
+        // Stop status first to make sure we aren't querying destructed objects
         run_status_.store(false);
         if (status_thread_.joinable()) status_thread_.join();
 
-        // Manually release the memory to make sure it's released
-        // in the correct order.
+        // !! Order is Critical !!
+        // Manually release the memory to make sure it's released in the correct order.
         xmit_ctrl_.reset();
         light_fem_.reset();
         charge_fem_.reset();
@@ -390,8 +396,6 @@ namespace controller {
 
         LOG_INFO(logger_, "Configured Hardware! \n");
         is_configured_ = true;
-        run_status_.store(true);
-        status_thread_ = std::thread(&Controller::StatusControl, this);
         return true;
     }
 
@@ -402,8 +406,6 @@ namespace controller {
         status_->ReadStatus(tpc_readout_monitor_, board_slots_, pcie_interface_.get(), false);
         if (!print_status_) {
             // Construct and send a status packet
-            // Command cmd(to_telem_u16(TelemetryCodes::TPC_Hardware_Status), status_vec.size());
-            // cmd.arguments = std::move(status_vec);
             auto tmp_vec = tpc_readout_monitor_.serialize();
             status_client_->WriteSendBuffer(to_telem_u16(TelemetryCodes::TPC_Hardware_Status), tmp_vec);
         } else {
@@ -418,7 +420,6 @@ namespace controller {
             std::this_thread::sleep_for(std::chrono::seconds(2));
             tpc_readout_monitor_.setErrorBitWord(data_handler_->getRunErrorCode()); // set the error from the data handler
             status_->SetDataHandlerStatus(data_handler_.get());
-            // tpc_readout_monitor_.setReadoutState(static_cast<uint32_t>(current_state_));
             status_->ReadStatus(tpc_readout_monitor_, board_slots_, pcie_interface_.get(), false);
             if (!print_status_) {
                 auto tmp_vec = tpc_readout_monitor_.serialize();
@@ -435,11 +436,6 @@ namespace controller {
         try {
             data_handler_->SetRun(true);
             data_thread_ = std::thread(&data_handler::DataHandler::CollectData, data_handler_.get(), pcie_interface_.get());
-            // Start status thread but only if it's not already running
-            if (!status_thread_.joinable()) {
-                run_status_.store(true);
-                status_thread_ = std::thread(&Controller::StatusControl, this);
-            }
         } catch (std::exception& ex) {
             LOG_ERROR(logger_, "Exception occurred starting DataHandler: {}", ex.what());
             data_handler_->SetRun(false);
@@ -453,8 +449,6 @@ namespace controller {
     }
 
     bool Controller::StopRun() {
-        run_status_.store(false);
-        if (status_thread_.joinable()) status_thread_.join();
 
         data_handler_->SetRun(false);
         if (data_thread_.joinable()) data_thread_.join();
