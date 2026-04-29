@@ -42,6 +42,19 @@ using json = nlohmann::json;
         tpc_monitor.setEndMarker(data_handler_metrics_["event_end_markers"]);
         tpc_monitor.setPpsCount(data_handler_metrics_["pps_count"]);
 
+        // Set error bits for datahandler
+        using ErrorBits = TpcReadoutMonitor::ErrorBits; // for convenience
+        size_t error_bitword = data_handler_metrics_["datahandler_error_bitword"];
+        tpc_monitor.setErrorBitWord(ErrorBits::dma_timeout, error_bitword);
+        tpc_monitor.setErrorBitWord(ErrorBits::free_dma_buffer_error, error_bitword);
+        tpc_monitor.setErrorBitWord(ErrorBits::switch_file_close_error, error_bitword);
+        tpc_monitor.setErrorBitWord(ErrorBits::switch_file_open_error, error_bitword);
+        tpc_monitor.setErrorBitWord(ErrorBits::send_pulse_train_error, error_bitword);
+        tpc_monitor.setErrorBitWord(ErrorBits::failed_write, error_bitword);
+        tpc_monitor.setErrorBitWord(ErrorBits::failed_locking_dma_buffers, error_bitword);
+        tpc_monitor.setErrorBitWord(ErrorBits::trigger_file_open_error, error_bitword);
+        tpc_monitor.setErrorBitWord(ErrorBits::pps_file_open_error, error_bitword);
+
         // If the PCIe cards are not initialized we cannot query the hardware.
         // Just set the board status words to 0x0
         bool pcie_initialized = pcie_interface->getInitStatus();

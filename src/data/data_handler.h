@@ -124,6 +124,16 @@ private:
     std::atomic<size_t> event_end_markers_ = 0;
     std::atomic<uint32_t> run_error_bit_ = 0;
 
+    // Metric error flags
+    std::atomic_bool dma_timeout_;
+    std::atomic_bool free_dma_buffer_error_;
+    std::atomic_bool switch_file_close_error_;
+    std::atomic_bool switch_file_open_error_;
+    std::atomic_bool send_pulse_train_error_;
+    std::atomic_bool failed_write_;
+    std::atomic_bool failed_locking_dma_buffers_;
+    std::atomic_bool trigger_file_open_error_;
+    std::atomic_bool pps_file_open_error_;
 
     std::atomic_bool read_write_buff_overflow_;
 

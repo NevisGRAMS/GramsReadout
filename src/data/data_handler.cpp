@@ -38,6 +38,7 @@ namespace data_handler {
     }
 
     std::map<std::string, size_t> DataHandler::GetMetrics() {
+
         std::map<std::string, size_t> metrics;
         metrics["run_number"] = run_number_;
         metrics["num_events"] = event_count_.load();
@@ -50,6 +51,20 @@ namespace data_handler {
         metrics["event_start_markers"] = event_start_markers_.load();
         metrics["event_end_markers"] = event_end_markers_.load();
         metrics["pps_count"] = pps_count_.load();
+
+        using ErrorBits = TpcReadoutMonitor::ErrorBits; // for convenience
+        size_t error_bitword = 0;
+        error_bitword |= dma_timeout_.load(std::memory_order_relaxed) << ErrorBits::dma_timeout;
+        error_bitword |= free_dma_buffer_error_.load(std::memory_order_relaxed) << ErrorBits::free_dma_buffer_error;
+        error_bitword |= switch_file_close_error_.load(std::memory_order_relaxed) << ErrorBits::switch_file_close_error;
+        error_bitword |= switch_file_open_error_.load(std::memory_order_relaxed) << ErrorBits::switch_file_open_error;
+        error_bitword |= send_pulse_train_error_.load(std::memory_order_relaxed) << ErrorBits::send_pulse_train_error;
+        error_bitword |= failed_write_.load(std::memory_order_relaxed) << ErrorBits::failed_write;
+        error_bitword |= failed_locking_dma_buffers_.load(std::memory_order_relaxed) << ErrorBits::failed_locking_dma_buffers;
+        error_bitword |= trigger_file_open_error_.load(std::memory_order_relaxed) << ErrorBits::trigger_file_open_error;
+        error_bitword |= pps_file_open_error_.load(std::memory_order_relaxed) << ErrorBits::pps_file_open_error;
+
+        metrics["datahandler_error_bitword"] = error_bitword;
 
         // Since we poll the metrics every dt we can find the average rate
         prev_event_count_ = event_count_.load();
@@ -163,6 +178,7 @@ namespace data_handler {
             LOG_DEBUG(logger_, "Closing data file {} \n", fd_copy);
             if(close(fd_copy) == -1) {
                 LOG_ERROR(logger_, "Failed to close data file, with error:{} \n", std::string(strerror(errno)));
+                switch_file_close_error_.store(true, std::memory_order_relaxed);
             }
         });
         close_thread.detach();
@@ -173,6 +189,7 @@ namespace data_handler {
         fd_ = open(name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if (fd_ == -1) {
             LOG_ERROR(logger_, "Failed to open file {} with error {} aborting run! \n", name, std::string(strerror(errno)));
+            switch_file_open_error_.store(true, std::memory_order_relaxed);
             return false;
         }
 
@@ -209,6 +226,7 @@ namespace data_handler {
         int ret = std::system("ad3_ctrl 3");
         if (ret != 0) {
             LOG_ERROR(logger_, "Pulse train send error, return value: {} \n", ret);
+            send_pulse_train_error_.store(true, std::memory_order_relaxed);
         }
         LOG_INFO(logger_, "Sent pulse train... \n");
 
@@ -230,6 +248,7 @@ namespace data_handler {
     }
 
     void DataHandler::FastDataWrite() {
+        // Test function to benchmark write speed without checking for event start/end markers.
         LOG_INFO(logger_, "Fast Read thread start! \n");
 
         std::string name = write_file_name_  + std::to_string(file_count_.load()) + ".dat";
@@ -270,6 +289,7 @@ namespace data_handler {
         fd_ = open(name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if (fd_ == -1) {
             LOG_ERROR(logger_, "Failed to open file {} with error {} aborting run! \n", name, std::string(strerror(errno)));
+            switch_file_open_error_.store(true, std::memory_order_relaxed);
         }
 
         uint32_t word;
@@ -323,7 +343,10 @@ namespace data_handler {
                     if (event_chunk == EVENTCHUNK) {
                         if ((local_event_count % 50) == 0) LOG_INFO(logger_, " **** Event: {} \n", local_event_count);
                         const int write_bytes = write(fd_, event_buffer_ptr, num_words*sizeof(uint32_t));
-                        if (write_bytes == -1) LOG_WARNING(logger_, "Failed write {} \n", std::string(strerror(errno)));
+                        if (write_bytes == -1) {
+                            LOG_WARNING(logger_, "Failed write {} \n", std::string(strerror(errno)));
+                            failed_write_.store(true, std::memory_order_relaxed);
+                        }
                         else num_recv_bytes += static_cast<size_t>(write_bytes);
 
                         if ((local_event_count > 0) && (local_event_count % 5000 == 0)) {
@@ -380,11 +403,13 @@ namespace data_handler {
         if (!SetRecvBuffer(pcie_interface, &pbuf_rec1, &pbuf_rec2, true)) {
             // Shut it all down if DMA buffers are not aquired otherwise it will try to access
             LOG_ERROR(logger_, "Failed to initialize DMA buffers");
+            failed_locking_dma_buffers_.store(true, std::memory_order_relaxed);
             is_running_.store(false);
             stop_write_.store(true);
             try {
                 pcie_interface->FreeDmaContigBuffers();
             } catch (std::exception &e) {
+                free_dma_buffer_error_.store(true, std::memory_order_relaxed);
                 LOG_INFO(logger_, "Caught exception freeing DMA buffers: {}", e.what());
                 LOG_INFO(logger_, "Could not free DMA buffers during abort start. Likely they weren't acquired");
             }
@@ -504,6 +529,7 @@ namespace data_handler {
         // they go out of scope
         LOG_DEBUG(logger_, "Freeing DMA buffers and closing file..\n");
         if (!pcie_interface->FreeDmaContigBuffers()) {
+            free_dma_buffer_error_.store(true, std::memory_order_relaxed);
             LOG_ERROR(logger_, "Failed freeing DMA buffers! \n");
         }
 
@@ -511,7 +537,8 @@ namespace data_handler {
     }
 
     void DataHandler::ReadoutViaController(pcie_int::PCIeInterface *pcie_interface, pcie_int::PcieBuffers *buffers) {
-
+        // Read TPC/SiPM data but through Controller board not XMIT
+        // FIXME does not work yet!
         std::array<uint32_t, DATABUFFSIZE> word_arr{};
         buffers->psend = buffers->buf_send.data();
 
@@ -643,7 +670,7 @@ namespace data_handler {
         trig_data_ctr_ = 0xFFFFFF;
 
         constexpr size_t TRIG_BUFFER_SIZE = 250;
-        std::array<TriggerSample, TRIG_BUFFER_SIZE> trig_sample_buffer;
+        std::array<TriggerSample, TRIG_BUFFER_SIZE> trig_sample_buffer{};
 
         LOG_INFO(logger_, "Opening Trigger data file");
         // std::ofstream trigger_file;
@@ -651,7 +678,8 @@ namespace data_handler {
         std::string trigger_file_name = data_basedir_ + "/trigger_data/trigger_data_" + std::to_string(run_number_) + ".csv";
         std::ofstream trigger_file(trigger_file_name, std::ios::binary | std::ios::app);
         if (!trigger_file.is_open()) {
-         LOG_WARNING(logger_, "Trigger file failed to open, only printing!");
+            LOG_WARNING(logger_, "Trigger file failed to open, only printing!");
+            trigger_file_open_error_.store(true, std::memory_order_relaxed);
         }
 
         // 1. Start with initializing 2nd fiber on the PCIe card
@@ -765,7 +793,11 @@ namespace data_handler {
             if ((*data & hw_consts::dma_in_progress) == 0) {
                 return true;
             }
-            if ((is > 0) && ((is % 10000000) == 0)) std::cout << "Wait iter: " << is << "\n";
+            if ((is > 0) && ((is % 10000000) == 0)) {
+                // Don't care so much about ordering across threads so use relaxed
+                dma_timeout_.store(true, std::memory_order_relaxed);
+                std::cout << "Wait iter: " << is << "\n";
+            }
             if (!is_running_.load()) break;
         }
         return false;
@@ -788,6 +820,7 @@ namespace data_handler {
         std::ofstream pps_file(pps_file_name, std::ios::binary | std::ios::app);
         if (!pps_file.is_open()) {
             LOG_WARNING(logger_, "PPS file failed to open, only printing!");
+            pps_file_open_error_.store(true, std::memory_order_relaxed);
         }
 
         size_t read_counter = 0;
