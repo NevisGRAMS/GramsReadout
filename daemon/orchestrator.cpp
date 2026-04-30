@@ -630,6 +630,10 @@ void DAQHandler(std::shared_ptr<TCPConnection> &command_client_ptr, std::shared_
                 // FIXME should Stop be sent to all child services before restart?
                 ControlService(kOrchestrator, kRestartUnit, logger);
                 break;
+            } case to_u16(CommunicationCodes::ORC_Clear_Errors): {
+                // Command to manually clear error codes
+                g_daq_monitor.clearErrorBitWord();
+                break;
             }
             default: {
                 QUILL_LOG_WARNING(logger, "Unknown command {}", cmd.command);
