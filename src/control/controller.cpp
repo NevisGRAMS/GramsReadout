@@ -256,6 +256,9 @@ namespace controller {
             // drift length in 2MHz ticks
             config["readout_windows"]["timesize"] = tpc_configs_.getDriftSize();
 
+            // Size of the DMA buffer in kB
+            config["data_handler"]["dma_buffer_size_kb"] =  tpc_configs_.getDmaBufferkB();           
+
             // prescale (array → JSON array)
             auto& prescales = tpc_configs_.getPrescale();
             // element 2 is the light trigger
@@ -418,7 +421,6 @@ namespace controller {
 
         while (run_status_) {
             std::this_thread::sleep_for(std::chrono::seconds(2));
-            tpc_readout_monitor_.setErrorBitWord(data_handler_->getRunErrorCode()); // set the error from the data handler
             status_->SetDataHandlerStatus(data_handler_.get());
             status_->ReadStatus(tpc_readout_monitor_, board_slots_, pcie_interface_.get(), false);
             if (!print_status_) {
