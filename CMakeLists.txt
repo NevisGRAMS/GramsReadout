@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 project(GramsReadout)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 
 # Enable pedantic compile mode, we want to be as strict as possible
 # at compile time rather than find problems at run time which could be too late.
