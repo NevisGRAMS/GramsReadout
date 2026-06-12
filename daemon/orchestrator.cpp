@@ -271,33 +271,61 @@ void GetComputerStatus(quill::Logger *logger) {
     // Define the scaling factor for load averages if not readily available
     // Usually it's (1 << SI_LOAD_SHIFT), and SI_LOAD_SHIFT is typically 16
     // constexpr double LOAD_SCALE = 65536.0; // 2^16
-    // auto data_basedir = std::string(std::getenv("DATA_BASE_DIR"));
-    char *data_basedir_ptr = std::getenv("DATA_BASE_DIR");
-    if (data_basedir_ptr == nullptr) {
-        std::cerr << "Could not find env variable DATA_BASE_DIR " << std::endl;
+    // auto data_basedir = std::string(std::getenv("DATA_SSD0_DIR"));
+    constexpr unsigned long long GB_divisor = 1024 * 1024 * 1024;
+
+    char *data_ssd0_ptr = std::getenv("DATA_SSD0_DIR");
+    if (data_ssd0_ptr == nullptr) {
+        std::cerr << "Could not find env variable DATA_SSD0_DIR " << std::endl;
         g_daq_monitor.setErrorBitWord(DaqCompMonitor::ErrorBits::disk_free_status);
         return;
     }
-    constexpr unsigned long long GB_divisor = 1024 * 1024 * 1024;
-    auto data_basedir = std::string(data_basedir_ptr);
+    auto data_ssd0 = std::string(data_ssd0_ptr);
+
+    char *data_ssd1_ptr = std::getenv("DATA_SSD1_DIR");
+    if (data_ssd1_ptr == nullptr) {
+        std::cerr << "Could not find env variable DATA_SSD1_DIR " << std::endl;
+        g_daq_monitor.setErrorBitWord(DaqCompMonitor::ErrorBits::disk_free_status);
+        return;
+    }
+    auto data_ssd1 = std::string(data_ssd1_ptr);
 
     try {
-        struct statfs data_disk_info{};
-        if (statfs(data_basedir.c_str(), &data_disk_info) == 0) {
-            const auto free_space = static_cast<unsigned long>(data_disk_info.f_bavail * data_disk_info.f_frsize);
+       // The SSD0 disk
+        struct statfs data_disk_info1{};
+        if (statfs(data_ssd0.c_str(), &data_disk_info1) == 0) {
+            const auto free_space = static_cast<unsigned long>(data_disk_info1.f_bavail * data_disk_info1.f_frsize);
             g_daq_monitor.setTpcDisk(free_space / GB_divisor);
         } else {
             QUILL_LOG_ERROR(logger, "Failed to get data disk space with error {}", strerror(errno));
             g_daq_monitor.setErrorBitWord(DaqCompMonitor::ErrorBits::disk_free_status);
         }
-        struct statfs tof_data_disk_info{};
-        if (statfs((data_basedir + "/tof_data").c_str(), &tof_data_disk_info) == 0) {
-            const auto free_space = static_cast<unsigned long>(tof_data_disk_info.f_bavail * tof_data_disk_info.f_frsize);
+        struct statfs tof_data_disk_info1{};
+        if (statfs((data_ssd0 + "/tof_data").c_str(), &tof_data_disk_info1) == 0) {
+            const auto free_space = static_cast<unsigned long>(tof_data_disk_info1.f_bavail * tof_data_disk_info1.f_frsize);
             g_daq_monitor.setTofDisk(free_space / GB_divisor);
         } else {
             QUILL_LOG_ERROR(logger, "Failed to get TOF data disk space with error {}", strerror(errno));
             g_daq_monitor.setErrorBitWord(DaqCompMonitor::ErrorBits::disk_free_status);
         }
+        // The SSD1 disk
+        struct statfs data_disk_info2{};
+        if (statfs(data_ssd1.c_str(), &data_disk_info2) == 0) {
+            const auto free_space = static_cast<unsigned long>(data_disk_info2.f_bavail * data_disk_info2.f_frsize);
+            g_daq_monitor.setTpcDisk(free_space / GB_divisor);
+        } else {
+            QUILL_LOG_ERROR(logger, "Failed to get data disk space with error {}", strerror(errno));
+            g_daq_monitor.setErrorBitWord(DaqCompMonitor::ErrorBits::disk_free_status);
+        }
+        struct statfs tof_data_disk_info2{};
+        if (statfs((data_ssd1 + "/tof_data").c_str(), &tof_data_disk_info2) == 0) {
+            const auto free_space = static_cast<unsigned long>(tof_data_disk_info2.f_bavail * tof_data_disk_info2.f_frsize);
+            g_daq_monitor.setTofDisk(free_space / GB_divisor);
+        } else {
+            QUILL_LOG_ERROR(logger, "Failed to get TOF data disk space with error {}", strerror(errno));
+            g_daq_monitor.setErrorBitWord(DaqCompMonitor::ErrorBits::disk_free_status);
+        }
+        // The main system disk where the the OS lives
         struct statfs main_disk_info{};
         if (statfs("/", &main_disk_info) == 0) {
             const auto free_space = static_cast<unsigned long>(main_disk_info.f_bavail * main_disk_info.f_frsize);
@@ -633,6 +661,32 @@ void DAQHandler(std::shared_ptr<TCPConnection> &command_client_ptr, std::shared_
             } case to_u16(CommunicationCodes::ORC_Clear_Errors): {
                 // Command to manually clear error codes
                 g_daq_monitor.clearErrorBitWord();
+                break;
+            } case to_u16(CommunicationCodes::ORC_Set_Data_SSD0): {
+                char *data_ssd0_ptr = std::getenv("DATA_SSD0_DIR");
+                if (data_ssd0_ptr == nullptr) {
+                   QUILL_LOG_WARNING(logger, "Could not find env variable DATA_SSD0_DIR! \n");
+                }
+                std::ofstream env_file("/run_number/data_ssd.conf");
+                if (env_file.is_open()) {
+                   env_file << " DATA_BASE_DIR=" << std::string(data_ssd0_ptr) << "\n";
+                   QUILL_LOG_INFO(logger, "DATA_BASE_DIR set to: {} \n", std::string(data_ssd0_ptr));
+                } else {
+                   QUILL_LOG_WARNING(logger, "Failed to set environment DATA_SSD1_DIR variable! \n");
+                }
+                break;
+            } case to_u16(CommunicationCodes::ORC_Set_Data_SSD1): {                                    
+                char *data_ssd1_ptr = std::getenv("DATA_SSD1_DIR");
+                if (data_ssd1_ptr == nullptr) {
+                   QUILL_LOG_WARNING(logger, "Could not find env variable DATA_SSD1_DIR! \n");
+                }
+                std::ofstream env_file("/run_number/data_ssd.conf");
+                if (env_file.is_open()) {
+                   env_file << " DATA_BASE_DIR=" << std::string(data_ssd1_ptr) << "\n";
+                   QUILL_LOG_INFO(logger, "DATA_BASE_DIR set to: {} \n", std::string(data_ssd1_ptr));
+                } else {
+                   QUILL_LOG_WARNING(logger, "Failed to set DATA_SSD1_DIR environment variable! \n");
+                }
                 break;
             }
             default: {

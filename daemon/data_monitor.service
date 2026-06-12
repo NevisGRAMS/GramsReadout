@@ -23,6 +23,7 @@ Group=root
 # Working directory (optional, defaults to /)
 # WorkingDirectory=/opt/my_controller
 
+EnvironmentFile=/run_number/data_ssd.conf
 # Environment variables (optional, alternative to config files)
 # Environment="CONFIG_FILE=/etc/my_controller/config.yaml"
 # Environment="LOG_LEVEL=debug"

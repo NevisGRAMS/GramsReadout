@@ -120,7 +120,8 @@ namespace controller {
 
     bool Controller::PersistRunId() {
         bool read_write_success = false;
-        std::string run_id_file = data_basedir_ + "/run_id.txt";
+        // Since we switch between 2 data SSDs we want to tie the run ID file to the system disk so it doesn't cahnge.
+        std::string run_id_file = "/run_number/run_id.txt";
 
         std::fstream run_id_file_in(run_id_file, std::ios::in);
         if (run_id_file_in.is_open()) {

@@ -27,6 +27,13 @@ Group=root
 # Environment="CONFIG_FILE=/etc/my_controller/config.yaml"
 # Environment="LOG_LEVEL=debug"
 
+# Add the correct absolute paths here
+Environment="TPC_DAQ_BASEDIR="
+
+Environment="DATA_SSD0_DIR=/write_data_nvme_ssd0" 
+Environment="DATA_SSD1_DIR=/write_data_nvme_ssd1" 
+Environment="DATA_SSD2_DIR=" 
+
 # Restart behavior
 Restart=on-failure
 # Other options: no, always, on-success, on-abnormal, on-abort
