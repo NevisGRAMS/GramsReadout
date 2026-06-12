@@ -284,7 +284,7 @@ void GetComputerStatus(quill::Logger *logger) {
         struct statfs data_disk_info{};
         if (statfs(data_basedir.c_str(), &data_disk_info) == 0) {
             const auto free_space = static_cast<unsigned long>(data_disk_info.f_bavail * data_disk_info.f_frsize);
-            g_daq_monitor.setTpcDisk(free_space / GB_divisor);
+            g_daq_monitor.setTpcDisk0(free_space / GB_divisor);
         } else {
             QUILL_LOG_ERROR(logger, "Failed to get data disk space with error {}", strerror(errno));
             g_daq_monitor.setErrorBitWord(DaqCompMonitor::ErrorBits::disk_free_status);
@@ -292,7 +292,7 @@ void GetComputerStatus(quill::Logger *logger) {
         struct statfs tof_data_disk_info{};
         if (statfs((data_basedir + "/tof_data").c_str(), &tof_data_disk_info) == 0) {
             const auto free_space = static_cast<unsigned long>(tof_data_disk_info.f_bavail * tof_data_disk_info.f_frsize);
-            g_daq_monitor.setTofDisk(free_space / GB_divisor);
+            g_daq_monitor.setTofDisk0(free_space / GB_divisor);
         } else {
             QUILL_LOG_ERROR(logger, "Failed to get TOF data disk space with error {}", strerror(errno));
             g_daq_monitor.setErrorBitWord(DaqCompMonitor::ErrorBits::disk_free_status);
