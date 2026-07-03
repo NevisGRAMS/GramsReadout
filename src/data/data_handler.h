@@ -162,7 +162,11 @@ private:
         uint32_t pps_div;
     };
 
-    // Parsed trigger fields (48 B/record). Written to trigger_data_{run}.bin
+    // When false, TriggerDMARead writes only trigger_raw_{run}.bin (16 B/record).
+    // Parsed sidecar can be reproduced offline from raw PCIe words.
+    static constexpr bool kWriteParsedTriggerSidecar = false;
+
+    // Parsed trigger fields (48 B/record). Written to trigger_data_{run}.bin when enabled.
     struct TriggerSample {
         uint64_t trig_ctr;
         uint64_t trig_data_ctr;
