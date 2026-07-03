@@ -162,7 +162,7 @@ private:
         uint32_t pps_div;
     };
 
-    // Struct to read PPS samples (this will be 48B and no padding)
+    // Parsed trigger fields (48 B/record). Written to trigger_data_{run}.bin
     struct TriggerSample {
         uint64_t trig_ctr;
         uint64_t trig_data_ctr;
@@ -170,6 +170,12 @@ private:
         uint64_t trig_sample;
         uint64_t trig_sample_16MHz_remain;
         uint64_t trig_sample_64MHz_remain;
+    };
+
+    // Raw PCIe t2_tr_bar payload before bit unpacking (16 B/record).
+    struct TriggerRawRecord {
+        uint64_t trig_data0;
+        uint64_t trig_data1;
     };
 };
 

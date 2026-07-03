@@ -671,15 +671,26 @@ namespace data_handler {
 
         constexpr size_t TRIG_BUFFER_SIZE = 250;
         std::array<TriggerSample, TRIG_BUFFER_SIZE> trig_sample_buffer{};
+        std::array<TriggerRawRecord, TRIG_BUFFER_SIZE> trig_raw_buffer{};
 
-        LOG_INFO(logger_, "Opening Trigger data file");
-        // std::ofstream trigger_file;
-        // std::string trigger_file_name = "trigger_data_run" + std::to_string(run_number_) + ".csv" ;
-        std::string trigger_file_name = data_basedir_ + "/trigger_data/trigger_data_" + std::to_string(run_number_) + ".csv";
+        LOG_INFO(logger_, "Opening Trigger data files");
+        const std::string trigger_file_name = data_basedir_ + "/trigger_data/trigger_data_"
+                                              + std::to_string(run_number_) + ".bin";
+        const std::string trigger_raw_file_name = data_basedir_ + "/trigger_data/trigger_raw_"
+                                                  + std::to_string(run_number_) + ".bin";
         std::ofstream trigger_file(trigger_file_name, std::ios::binary | std::ios::app);
+        std::ofstream trigger_raw_file(trigger_raw_file_name, std::ios::binary | std::ios::app);
         if (!trigger_file.is_open()) {
-            LOG_WARNING(logger_, "Trigger file failed to open, only printing!");
+            LOG_WARNING(logger_, "Trigger parsed file failed to open!");
             trigger_file_open_error_.store(true, std::memory_order_relaxed);
+        } else {
+            LOG_INFO(logger_, "Writing parsed trigger records to {}", trigger_file_name);
+        }
+        if (!trigger_raw_file.is_open()) {
+            LOG_WARNING(logger_, "Trigger raw file failed to open!");
+            trigger_file_open_error_.store(true, std::memory_order_relaxed);
+        } else {
+            LOG_INFO(logger_, "Writing raw trigger records to {}", trigger_raw_file_name);
         }
 
         // 1. Start with initializing 2nd fiber on the PCIe card
@@ -692,81 +703,97 @@ namespace data_handler {
 
         size_t read_counter = 0;
         while (is_running_.load()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
             pcie_interface->ReadReg64(kDev1, hw_consts::cs_bar, hw_consts::t2_cs_reg, &trig_data_ctr);
             trig_data_ctr = (trig_data_ctr>>32) & 0xffffff;
-            if ( (trig_data_ctr_ - trig_data_ctr) < 16 ) {
-                if (!is_running_.load()) break;
-                continue;
+
+            // Drain every pending 16 B trigger record before sleeping again. At 500 Hz a
+            // fixed 5 ms poll that reads only one record loses most triggers; readout DMA
+            // avoids this by filling large contiguous buffers in one transfer.
+            while (is_running_.load() && (trig_data_ctr_ - trig_data_ctr) >= 16) {
+                if (trig_data_ctr < 1) {
+                    LOG_ERROR(logger_, "Got 0 trigger data! \n");
+                }
+
+                unsigned long long trig_data0;
+                unsigned long long trig_data1;
+                pcie_interface->ReadReg64(kDev1, hw_consts::t2_tr_bar, 0x0, &trig_data0);
+                trig_data1 = trig_data0;
+                pcie_interface->ReadReg64(kDev1, hw_consts::t2_tr_bar, 0x0, &trig_data1);
+
+                uint64_t trig_ctr = (trig_data0 >> 40);
+                uint64_t trig_frame = ( ( ( (trig_data0 >> 32) & 0xff ) << 16 ) + ( (trig_data0 >> 16) & 0xffff ) );
+                uint64_t trig_sample = ( (trig_data0 >> 4) & 0xfff );
+                uint64_t trig_sample_remain_16MHz = ( (trig_data0 >> 1) & 0x7 );
+                uint64_t trig_sample_remain_64MHz = ( (trig_data1 >> 15) & 0x3 );
+
+                trig_sample_buffer[read_counter].trig_ctr = trig_ctr;
+                trig_sample_buffer[read_counter].trig_data_ctr = trig_data_ctr;
+                trig_sample_buffer[read_counter].trig_frame = trig_frame;
+                trig_sample_buffer[read_counter].trig_sample = trig_sample;
+                trig_sample_buffer[read_counter].trig_sample_16MHz_remain = trig_sample_remain_16MHz;
+                trig_sample_buffer[read_counter].trig_sample_64MHz_remain = trig_sample_remain_64MHz;
+                trig_raw_buffer[read_counter].trig_data0 = trig_data0;
+                trig_raw_buffer[read_counter].trig_data1 = trig_data1;
+                read_counter++;
+
+                if (read_counter >= TRIG_BUFFER_SIZE) {
+                    if (trigger_file.is_open()) {
+                        trigger_file.write(reinterpret_cast<const char*>(trig_sample_buffer.data()),
+                                           trig_sample_buffer.size() * sizeof(TriggerSample));
+                    }
+                    if (trigger_raw_file.is_open()) {
+                        trigger_raw_file.write(reinterpret_cast<const char*>(trig_raw_buffer.data()),
+                                               trig_raw_buffer.size() * sizeof(TriggerRawRecord));
+                    }
+                    read_counter = 0;
+                }
+
+                if (debug) {
+                    std::ostringstream msg;
+                    msg << "\033[1;33;40m[ NEW TRIGGER ]\033[00m\n"
+                    << " "
+                    << " TrigBytes: " << trig_data_ctr
+                    << " Trig: "   << trig_ctr
+                    << " Frame: "  << trig_frame
+                    << " Sample: " << trig_sample
+                    << " Remine (16MHz): " << trig_sample_remain_16MHz
+                    << " Remine (64MHz): " << trig_sample_remain_64MHz
+                    << "\n"
+                    << " "
+                    << " Bits: \033[1;35;40m";
+                    if((trig_data1>>8) & 0x1) msg << " PC";
+                    if((trig_data1>>9) & 0x1) msg << " EXT";
+                    if((trig_data1>>12) & 0x1) msg << " Gate1";
+                    if((trig_data1>>11) & 0x1) msg << " Gate2";
+                    if((trig_data1>>10) & 0x1) msg << " Active";
+                    if((trig_data1>>13) & 0x1) msg << " Veto";
+                    if((trig_data1>>14) & 0x1) msg << " Calib";
+                    msg << "\033[00m\n";
+                    std::cout << msg.str() << std::endl;
+                 }
+
+                trig_data_ctr_ -= 16;
+                pcie_interface->ReadReg64(kDev1, hw_consts::cs_bar, hw_consts::t2_cs_reg, &trig_data_ctr);
+                trig_data_ctr = (trig_data_ctr>>32) & 0xffffff;
             }
 
-            if (trig_data_ctr < 1) {
-                LOG_ERROR(logger_, "Got 0 trigger data! \n");
-            }
-
-            unsigned long long trig_data0;
-            unsigned long long trig_data1;
-            pcie_interface->ReadReg64(kDev1, hw_consts::t2_tr_bar, 0x0, &trig_data0);
-            trig_data1 = trig_data0;
-            pcie_interface->ReadReg64(kDev1, hw_consts::t2_tr_bar, 0x0, &trig_data1);
-
-            uint64_t trig_ctr = (trig_data0 >> 40);
-            uint64_t trig_frame = ( ( ( (trig_data0 >> 32) & 0xff ) << 16 ) + ( (trig_data0 >> 16) & 0xffff ) );
-            uint64_t trig_sample = ( (trig_data0 >> 4) & 0xfff );
-            uint64_t trig_sample_remain_16MHz = ( (trig_data0 >> 1) & 0x7 );
-            uint64_t trig_sample_remain_64MHz = ( (trig_data1 >> 15) & 0x3 );
-
-            trig_sample_buffer[read_counter].trig_ctr = trig_ctr;
-            trig_sample_buffer[read_counter].trig_data_ctr = trig_data_ctr;
-            trig_sample_buffer[read_counter].trig_frame = trig_frame;
-            trig_sample_buffer[read_counter].trig_sample = trig_sample;
-            trig_sample_buffer[read_counter].trig_sample_16MHz_remain = trig_sample_remain_16MHz;
-            trig_sample_buffer[read_counter].trig_sample_64MHz_remain = trig_sample_remain_64MHz;
-            read_counter++;
-
-            // trigger_file << trig_ctr << ", " << trig_frame << ", " << trig_sample << ", "
-            //           << trig_sample_remain_16MHz << ", " << trig_sample_remain_64MHz << ", "
-            //           << trig_data_ctr << "\n";
-
-            if (read_counter >= TRIG_BUFFER_SIZE) {
-                trigger_file.write(reinterpret_cast<const char*>(trig_sample_buffer.data()),
-                               trig_sample_buffer.size() * sizeof(TriggerSample));
-                read_counter = 0;
-            }
-
-            if (debug) {
-                std::ostringstream msg;
-                msg << "\033[1;33;40m[ NEW TRIGGER ]\033[00m\n"
-                << " "
-                << " TrigBytes: " << trig_data_ctr
-                << " Trig: "   << trig_ctr
-                << " Frame: "  << trig_frame
-                << " Sample: " << trig_sample
-                << " Remine (16MHz): " << trig_sample_remain_16MHz
-                << " Remine (64MHz): " << trig_sample_remain_64MHz
-                << "\n"
-                << " "
-                << " Bits: \033[1;35;40m";
-                if((trig_data1>>8) & 0x1) msg << " PC";
-                if((trig_data1>>9) & 0x1) msg << " EXT";
-                if((trig_data1>>12) & 0x1) msg << " Gate1";
-                if((trig_data1>>11) & 0x1) msg << " Gate2";
-                if((trig_data1>>10) & 0x1) msg << " Active";
-                if((trig_data1>>13) & 0x1) msg << " Veto";
-                if((trig_data1>>14) & 0x1) msg << " Calib";
-                msg << "\033[00m\n";
-                std::cout << msg.str() << std::endl;
-             }
-
-            trig_data_ctr_ -= 16;
+            if (!is_running_.load()) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
 
-        // If any remaining samples write them to file before closing
+        // Flush any remaining samples before closing
         if (read_counter > 0) {
-            trigger_file.write(reinterpret_cast<const char*>(trig_sample_buffer.data()),
-                            (read_counter - 1) * sizeof(TriggerSample));
+            if (trigger_file.is_open()) {
+                trigger_file.write(reinterpret_cast<const char*>(trig_sample_buffer.data()),
+                                   read_counter * sizeof(TriggerSample));
+            }
+            if (trigger_raw_file.is_open()) {
+                trigger_raw_file.write(reinterpret_cast<const char*>(trig_raw_buffer.data()),
+                                       read_counter * sizeof(TriggerRawRecord));
+            }
         }
         trigger_file.close();
+        trigger_raw_file.close();
         LOG_INFO(logger_, "Ended Trigger Read {} \n", trig_data_ctr_);
     }
 
