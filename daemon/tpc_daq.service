@@ -12,7 +12,10 @@ Type=simple
 # Since we don't have access to environment variables list them here
 # TPC Readout Env Vars
 EnvironmentFile=/run_number/data_ssd.conf
-Environment="TPC_DAQ_BASEDIR=/home/???/GramsReadout" 
+Environment="TPC_DAQ_BASEDIR=/home/???/GramsReadout"
+Environment="DATA_SSD0_DIR=/write_data_nvme_ssd0"
+Environment="DATA_SSD1_DIR=/write_data_nvme_ssd1"
+Environment="DATA_PICK_MAX_FREE=0"
 
 # Path to the compiled, installed executable
 ExecStart=/usr/local/bin/tpc_daq

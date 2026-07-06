@@ -3,8 +3,10 @@
 //
 
 #include "data_handler.h"
+#include "storage_utils.h"
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <iostream>
 #include <fstream>
 #include <cstdio>
@@ -13,6 +15,8 @@
 #include <pthread.h>
 #include <sched.h>
 #include <cstdlib>
+#include <ctime>
+#include <iomanip>
 
 #include "quill/LogMacros.h"
 
@@ -29,7 +33,11 @@ namespace data_handler {
         read_write_buff_overflow_(false),
         file_count_(0),
         stop_write_(false),
-        pps_count_(0) {
+        pps_count_(0),
+        disk_full_(false),
+        disk_failover_(false),
+        disk_stop_requested_(false),
+        disk_switch_requested_(false) {
         logger_ = quill::Frontend::create_or_get_logger("readout_logger");
     }
 
@@ -63,6 +71,8 @@ namespace data_handler {
         error_bitword |= failed_locking_dma_buffers_.load(std::memory_order_relaxed) << ErrorBits::failed_locking_dma_buffers;
         error_bitword |= trigger_file_open_error_.load(std::memory_order_relaxed) << ErrorBits::trigger_file_open_error;
         error_bitword |= pps_file_open_error_.load(std::memory_order_relaxed) << ErrorBits::pps_file_open_error;
+        error_bitword |= disk_full_.load(std::memory_order_relaxed) << ErrorBits::disk_full;
+        error_bitword |= disk_failover_.load(std::memory_order_relaxed) << ErrorBits::disk_failover;
 
         metrics["datahandler_error_bitword"] = error_bitword;
 
@@ -153,6 +163,8 @@ namespace data_handler {
             LOG_INFO(logger_, "Trigger source software [{}] external [{}] \n", software_trig_, ext_trig_);
             LOG_DEBUG(logger_, "\t [{}] DMA loops with [{}] 32b words \n", num_dma_loops_, DATABUFFSIZE / 4);
             LOG_INFO(logger_, "\n Writing files: {}", write_file_name_);
+            InitNvmePathsFromEnv();
+            AppendStorageSegmentLog("run_start");
         } catch (std::exception &e) {
             LOG_ERROR(logger_, "Exception while getting DataHandler config, with error {} \n", e.what());
             return TpcReadoutMonitor::ErrorBits::datahandler_get_config;
@@ -166,6 +178,118 @@ namespace data_handler {
         DMABUFFSIZE *= 1000; // convert to bytes
 
         return 0x0;
+    }
+
+    void DataHandler::InitNvmePathsFromEnv() {
+        data_nvme_paths_ = storage_utils::GetNvmeCandidatesFromEnv();
+        active_nvme_index_ = 0;
+        for (size_t i = 0; i < data_nvme_paths_.size(); ++i) {
+            if (data_nvme_paths_[i] == data_basedir_) {
+                active_nvme_index_ = i;
+                break;
+            }
+        }
+    }
+
+    void DataHandler::AppendStorageSegmentLog(const std::string& reason) {
+        const std::string log_dir = data_basedir_ + "/config_logs";
+        mkdir(log_dir.c_str(), 0755);
+        std::string log_path = log_dir + "/run_" + std::to_string(run_number_) + "_storage.log";
+        std::ofstream log_file(log_path, std::ios::app);
+        if (!log_file.is_open()) {
+            LOG_WARNING(logger_, "Failed to open storage segment log {}", log_path);
+            return;
+        }
+
+        const auto now = std::chrono::system_clock::now();
+        const std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+        log_file << std::put_time(std::localtime(&now_time), "%F %T");
+        log_file << " reason=" << reason;
+        log_file << " basedir=" << data_basedir_;
+        log_file << " file_count=" << file_count_.load();
+        log_file << " event_count=" << event_count_.load();
+        log_file << " trigger_file=" << BuildTriggerRawFileName(data_basedir_, trigger_segment_file_num_.load());
+        log_file << "\n";
+    }
+
+    std::string DataHandler::BuildTriggerRawFileName(const std::string& basedir,
+                                                       size_t segment_file_num) const {
+        std::string name = basedir + "/trigger_data/trigger_raw_" + std::to_string(run_number_);
+        if (segment_file_num > 0) {
+            name += "_" + std::to_string(segment_file_num);
+        }
+        return name + ".bin";
+    }
+
+    std::string DataHandler::BuildPpsFileName(const std::string& basedir,
+                                              size_t segment_file_num) const {
+        std::string name = basedir + "/pps_data/pps_data_" + std::to_string(run_number_);
+        if (segment_file_num > 0) {
+            name += "_" + std::to_string(segment_file_num);
+        }
+        return name + ".csv";
+    }
+
+    void DataHandler::RequestDiskStop() {
+        disk_full_.store(true, std::memory_order_relaxed);
+        disk_stop_requested_.store(true, std::memory_order_relaxed);
+        is_running_.store(false);
+        stop_write_.store(true);
+        LOG_ERROR(logger_, "Disk stop requested; ending run gracefully to preserve closed files\n");
+    }
+
+    bool DataHandler::MaybeSwitchDataDisk() {
+        if (data_nvme_paths_.size() < 2) {
+            return false;
+        }
+
+        const auto current_free = storage_utils::GetFreeBytes(data_basedir_);
+        if (current_free.has_value() && *current_free >= storage_utils::kDiskFileSwitchMinFreeBytes) {
+            return false;
+        }
+
+        const size_t alt_index = (active_nvme_index_ == 0) ? 1 : 0;
+        const std::string& alt_path = data_nvme_paths_[alt_index];
+        const auto alt_query = storage_utils::QueryFreeBytes(alt_path);
+        if (alt_query.bytes.has_value()
+            && *alt_query.bytes < storage_utils::kDiskFileSwitchMinFreeBytes) {
+            LOG_ERROR(logger_,
+                "Both NVMe disks below reserve (current={} alt={} alt_path={}); requesting disk stop\n",
+                current_free.value_or(0), *alt_query.bytes, alt_path);
+            RequestDiskStop();
+            return false;
+        }
+        if (!alt_query.bytes.has_value()) {
+            if (access(alt_path.c_str(), F_OK) != 0) {
+                LOG_ERROR(logger_,
+                    "Alt NVMe {} unavailable (statvfs: {}, access: {}); requesting disk stop\n",
+                    alt_path, std::strerror(alt_query.statvfs_errno), std::strerror(errno));
+                RequestDiskStop();
+                return false;
+            }
+            LOG_WARNING(logger_,
+                "statvfs failed on alt {} ({}); proceeding with failover\n",
+                alt_path, std::strerror(alt_query.statvfs_errno));
+        }
+
+        LOG_INFO(logger_,
+            "Switching data disk from {} (free={} B) to {} (free={} B)\n",
+            data_basedir_, current_free.value_or(0), alt_path, alt_query.bytes.value_or(0));
+
+        {
+            std::lock_guard<std::mutex> lock(data_basedir_mutex_);
+            active_nvme_index_ = alt_index;
+            data_basedir_ = alt_path;
+            write_file_name_ = data_basedir_ + "/readout_data/pGRAMS_bin_"
+                               + std::to_string(run_number_) + "_";
+        }
+
+        // Align trigger segment name with the upcoming readout file index (e.g. _58.dat).
+        trigger_segment_file_num_.store(file_count_.load() + 1, std::memory_order_release);
+        disk_failover_.store(true, std::memory_order_relaxed);
+        disk_switch_requested_.store(true, std::memory_order_release);
+        AppendStorageSegmentLog("failover");
+        return true;
     }
 
     bool DataHandler::SwitchWriteFile() {
@@ -183,6 +307,15 @@ namespace data_handler {
         });
         close_thread.detach();
 
+        if (disk_stop_requested_.load(std::memory_order_relaxed)) {
+            return false;
+        }
+
+        MaybeSwitchDataDisk();
+        if (disk_stop_requested_.load(std::memory_order_relaxed)) {
+            return false;
+        }
+
         file_count_ += 1;
         std::string name = write_file_name_  + std::to_string(file_count_.load()) + ".dat";
 
@@ -190,6 +323,9 @@ namespace data_handler {
         if (fd_ == -1) {
             LOG_ERROR(logger_, "Failed to open file {} with error {} aborting run! \n", name, std::string(strerror(errno)));
             switch_file_open_error_.store(true, std::memory_order_relaxed);
+            if (errno == ENOSPC) {
+                RequestDiskStop();
+            }
             return false;
         }
 
@@ -290,6 +426,9 @@ namespace data_handler {
         if (fd_ == -1) {
             LOG_ERROR(logger_, "Failed to open file {} with error {} aborting run! \n", name, std::string(strerror(errno)));
             switch_file_open_error_.store(true, std::memory_order_relaxed);
+            if (errno == ENOSPC) {
+                RequestDiskStop();
+            }
         }
 
         uint32_t word;
@@ -346,11 +485,16 @@ namespace data_handler {
                         if (write_bytes == -1) {
                             LOG_WARNING(logger_, "Failed write {} \n", std::string(strerror(errno)));
                             failed_write_.store(true, std::memory_order_relaxed);
+                            if (errno == ENOSPC) {
+                                RequestDiskStop();
+                            }
                         }
                         else num_recv_bytes += static_cast<size_t>(write_bytes);
 
                         if ((local_event_count > 0) && (local_event_count % 5000 == 0)) {
-                            SwitchWriteFile();
+                            if (!SwitchWriteFile()) {
+                                stop_write_.store(true);
+                            }
                         }
                         num_recv_mB_.store(num_recv_bytes / 1000000);
                         num_event_chunk_words_.store(num_words / EVENTCHUNK);
@@ -674,8 +818,7 @@ namespace data_handler {
         std::array<TriggerSample, TRIG_BUFFER_SIZE> trig_sample_buffer{};
 
         LOG_INFO(logger_, "Opening Trigger data files");
-        const std::string trigger_raw_file_name = data_basedir_ + "/trigger_data/trigger_raw_"
-                                                  + std::to_string(run_number_) + ".bin";
+        const std::string trigger_raw_file_name = BuildTriggerRawFileName(data_basedir_, 0);
         std::ofstream trigger_raw_file(trigger_raw_file_name, std::ios::binary | std::ios::app);
         std::ofstream trigger_file;
         if constexpr (kWriteParsedTriggerSidecar) {
@@ -705,7 +848,77 @@ namespace data_handler {
         LOG_INFO(logger_, "Starting Trigger Read \n");
 
         size_t read_counter = 0;
+        auto flush_trigger_buffers = [&]() {
+            if (read_counter == 0) {
+                return;
+            }
+            if constexpr (kWriteParsedTriggerSidecar) {
+                if (trigger_file.is_open()) {
+                    trigger_file.write(reinterpret_cast<const char*>(trig_sample_buffer.data()),
+                                       read_counter * sizeof(TriggerSample));
+                }
+            }
+            if (trigger_raw_file.is_open()) {
+                trigger_raw_file.write(reinterpret_cast<const char*>(trig_raw_buffer.data()),
+                                       read_counter * sizeof(TriggerRawRecord));
+            }
+            read_counter = 0;
+        };
+
+        auto reopen_trigger_files = [&]() {
+            flush_trigger_buffers();
+            if constexpr (kWriteParsedTriggerSidecar) {
+                if (trigger_file.is_open()) {
+                    trigger_file.close();
+                }
+            }
+            if (trigger_raw_file.is_open()) {
+                trigger_raw_file.close();
+            }
+
+            std::string basedir;
+            size_t segment_file_num = 0;
+            {
+                std::lock_guard<std::mutex> lock(data_basedir_mutex_);
+                basedir = data_basedir_;
+                segment_file_num = trigger_segment_file_num_.load(std::memory_order_acquire);
+            }
+
+            const std::string trigger_raw_file_name = BuildTriggerRawFileName(basedir, segment_file_num);
+            trigger_raw_file.open(trigger_raw_file_name, std::ios::binary | std::ios::app);
+            if constexpr (kWriteParsedTriggerSidecar) {
+                std::string trigger_file_name = basedir + "/trigger_data/trigger_data_"
+                                                + std::to_string(run_number_);
+                if (segment_file_num > 0) {
+                    trigger_file_name += "_" + std::to_string(segment_file_num);
+                }
+                trigger_file_name += ".bin";
+                trigger_file.open(trigger_file_name, std::ios::binary | std::ios::app);
+                if (!trigger_file.is_open()) {
+                    trigger_file_open_error_.store(true, std::memory_order_relaxed);
+                }
+            }
+            if (!trigger_raw_file.is_open()) {
+                trigger_file_open_error_.store(true, std::memory_order_relaxed);
+                LOG_ERROR(logger_, "Failed to reopen trigger raw file on {}", trigger_raw_file_name);
+            } else {
+                LOG_INFO(logger_, "Reopened trigger raw file on {}", trigger_raw_file_name);
+            }
+        };
+
+        size_t open_segment = 0;
+        auto handle_disk_switch = [&]() {
+            const size_t segment = trigger_segment_file_num_.load(std::memory_order_acquire);
+            if (segment == open_segment) {
+                return;
+            }
+            reopen_trigger_files();
+            open_segment = segment;
+        };
+
         while (is_running_.load()) {
+            handle_disk_switch();
+
             pcie_interface->ReadReg64(kDev1, hw_consts::cs_bar, hw_consts::t2_cs_reg, &trig_data_ctr);
             trig_data_ctr = (trig_data_ctr>>32) & 0xffffff;
 
@@ -713,6 +926,8 @@ namespace data_handler {
             // fixed 5 ms poll that reads only one record loses most triggers; readout DMA
             // avoids this by filling large contiguous buffers in one transfer.
             while (is_running_.load() && (trig_data_ctr_ - trig_data_ctr) >= 16) {
+                handle_disk_switch();
+
                 if (trig_data_ctr < 1) {
                     LOG_ERROR(logger_, "Got 0 trigger data! \n");
                 }
@@ -856,15 +1071,52 @@ namespace data_handler {
         std::array<PPSSample, PPS_BUFFER_SIZE> pps_sample_buffer{};
 
         LOG_INFO(logger_, "Opening PPS data file");
-        std::string pps_file_name = data_basedir_ + "/pps_data/pps_data_" + std::to_string(run_number_) + ".csv" ;
+        std::string pps_file_name = BuildPpsFileName(data_basedir_, 0);
         std::ofstream pps_file(pps_file_name, std::ios::binary | std::ios::app);
         if (!pps_file.is_open()) {
             LOG_WARNING(logger_, "PPS file failed to open, only printing!");
             pps_file_open_error_.store(true, std::memory_order_relaxed);
+        } else {
+            LOG_INFO(logger_, "Writing PPS records to {}", pps_file_name);
         }
 
         size_t read_counter = 0;
+        auto reopen_pps_file = [&]() {
+            if (read_counter > 0 && pps_file.is_open()) {
+                pps_file.write(reinterpret_cast<const char*>(pps_sample_buffer.data()),
+                               read_counter * sizeof(PPSSample));
+                read_counter = 0;
+            }
+            if (pps_file.is_open()) {
+                pps_file.close();
+            }
+
+            std::string basedir;
+            size_t segment_file_num = 0;
+            {
+                std::lock_guard<std::mutex> lock(data_basedir_mutex_);
+                basedir = data_basedir_;
+                segment_file_num = trigger_segment_file_num_.load(std::memory_order_acquire);
+            }
+
+            pps_file_name = BuildPpsFileName(basedir, segment_file_num);
+            pps_file.open(pps_file_name, std::ios::binary | std::ios::app);
+            if (!pps_file.is_open()) {
+                LOG_ERROR(logger_, "Failed to reopen PPS file on {}", pps_file_name);
+                pps_file_open_error_.store(true, std::memory_order_relaxed);
+            } else {
+                LOG_INFO(logger_, "Reopened PPS file on {}", pps_file_name);
+            }
+        };
+
+        size_t open_segment = 0;
         while (is_running_.load()) {
+            const size_t segment = trigger_segment_file_num_.load(std::memory_order_acquire);
+            if (segment != open_segment) {
+                reopen_pps_file();
+                open_segment = segment;
+            }
+
             std::this_thread::sleep_for(std::chrono::milliseconds(pps_sample_period_));
             // init the receiver
             pcie_interface->PCIeRecvBuffer(1, 0, 1, num_status_words, 0, precv);
@@ -922,6 +1174,11 @@ namespace data_handler {
         num_recv_bytes_ = 0;
         run_error_bit_.store(0); // reset the error word
         pps_count_.store(0);
+        disk_full_.store(false);
+        disk_failover_.store(false);
+        disk_stop_requested_.store(false);
+        disk_switch_requested_.store(false);
+        trigger_segment_file_num_.store(0);
 
         // Reset the stop write flag so we can restart
         stop_write_.store(false);
@@ -931,6 +1188,7 @@ namespace data_handler {
 
         run_number_ = run_number;
         write_file_name_ = data_basedir_ + "/readout_data/pGRAMS_bin_" + std::to_string(run_number_) + "_";
+        InitNvmePathsFromEnv();
         LOG_INFO(logger_, "Reset data handler..");
 
         return true;

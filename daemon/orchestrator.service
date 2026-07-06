@@ -33,6 +33,8 @@ Environment="TPC_DAQ_BASEDIR="
 Environment="DATA_SSD0_DIR=/write_data_nvme_ssd0" 
 Environment="DATA_SSD1_DIR=/write_data_nvme_ssd1" 
 Environment="DATA_SSD2_DIR=" 
+# 0 = legacy SSD0-first at run start; 1 = pick NVMe with most free space
+Environment="DATA_PICK_MAX_FREE=0"
 
 # Restart behavior
 Restart=on-failure

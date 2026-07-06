@@ -37,6 +37,7 @@
 #include <statgrab.h>
 #include <fstream>
 #include <string>
+#include "storage_utils.h"
 
 // --- Configuration ---
 // Best practice: Load these from a config file or environment variables
@@ -506,6 +507,31 @@ void InitPcieDriver() {
     }
 }
 
+bool AutoSelectDataDir(quill::Logger *logger) {
+    const auto pick = storage_utils::SelectNvmeDataDir(
+        storage_utils::PickMaxFreeEnabled(),
+        storage_utils::kDiskRunStartMinFreeBytes);
+
+    if (pick.path.empty()) {
+        QUILL_LOG_WARNING(logger, "No NVMe data directories configured for auto selection \n");
+        return false;
+    }
+    if (!pick.ok) {
+        QUILL_LOG_ERROR(logger,
+            "Insufficient NVMe space to start DAQ (best free={} B, reserve={} B) \n",
+            pick.free_bytes, storage_utils::kDiskRunStartMinFreeBytes);
+        g_daq_monitor.setErrorBitWord(DaqCompMonitor::ErrorBits::disk_free_status);
+        return false;
+    }
+    if (!storage_utils::WriteDataBaseDirConf(pick.path)) {
+        QUILL_LOG_WARNING(logger, "Failed to write /run_number/data_ssd.conf \n");
+        return false;
+    }
+    QUILL_LOG_INFO(logger, "Auto-selected DATA_BASE_DIR={} (free={} GiB) \n",
+        pick.path, pick.free_bytes / (1024ULL * 1024ULL * 1024ULL));
+    return true;
+}
+
 bool ControlService(const std::string& unit_name, const std::string& method, quill::Logger *logger) {
     sd_bus *bus = nullptr;
     sd_bus_error error = SD_BUS_ERROR_NULL;
@@ -571,10 +597,14 @@ void DAQHandler(std::shared_ptr<TCPConnection> &command_client_ptr, std::shared_
                 break;
             }
             case to_u16(CommunicationCodes::ORC_Boot_All_DAQ): {
-                ControlService(kTpcDaq, kStartUnit, logger);
-                ControlService(kTofDaq, kStartUnit, logger);
-                ControlService(kDataMonitor, kStartUnit, logger);
-                QUILL_LOG_INFO(logger, "Booted All DAQ...");
+                if (AutoSelectDataDir(logger)) {
+                    ControlService(kTpcDaq, kStartUnit, logger);
+                    ControlService(kTofDaq, kStartUnit, logger);
+                    ControlService(kDataMonitor, kStartUnit, logger);
+                    QUILL_LOG_INFO(logger, "Booted All DAQ...");
+                } else {
+                    QUILL_LOG_ERROR(logger, "Skipped Boot All DAQ due to data disk selection failure \n");
+                }
                 break;
             }
             case to_u16(CommunicationCodes::ORC_Shutdown_All_DAQ): {
@@ -585,7 +615,11 @@ void DAQHandler(std::shared_ptr<TCPConnection> &command_client_ptr, std::shared_
                 break;
             }
             case to_u16(CommunicationCodes::ORC_Boot_Tpc_Daq): {
-                ControlService(kTpcDaq, kStartUnit, logger);
+                if (AutoSelectDataDir(logger)) {
+                    ControlService(kTpcDaq, kStartUnit, logger);
+                } else {
+                    QUILL_LOG_ERROR(logger, "Skipped Boot TPC DAQ due to data disk selection failure \n");
+                }
                 break;
             }
             case to_u16(CommunicationCodes::ORC_Shutdown_Tpc_Daq): { 

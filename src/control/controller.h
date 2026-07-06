@@ -21,6 +21,7 @@
 #include "tpc_configs.h"
 #include "CommunicationCodes.hh"
 #include "tpc_readout_monitor.h"
+#include "run_stop_coordinator.h"
 
 
 namespace controller {
@@ -93,6 +94,7 @@ namespace controller {
         bool GetStatus();
         bool Reset();
         void StatusControl();
+        void ApplyPendingRunStop();
         void ReadStatus();
 
         void InitPcieDriver();
@@ -100,6 +102,7 @@ namespace controller {
         void SendCallback(uint16_t command, bool success);
         json LoadConfig(const std::string &config_file);
         bool PersistRunId();
+        bool SelectNvmeDataDirForRun();
         bool JoinDataThread();
         json SetConfigFromComm(json& config, std::vector<uint32_t> &config_vec);
 
@@ -145,6 +148,7 @@ namespace controller {
 
         TpcConfigs tpc_configs_{};
         TpcReadoutMonitor tpc_readout_monitor_{};
+        RunStopCoordinator run_stop_coordinator_{};
 
     };
 

@@ -54,6 +54,8 @@ using json = nlohmann::json;
         tpc_monitor.updateErrorBitWord(ErrorBits::failed_locking_dma_buffers, error_bitword);
         tpc_monitor.updateErrorBitWord(ErrorBits::trigger_file_open_error, error_bitword);
         tpc_monitor.updateErrorBitWord(ErrorBits::pps_file_open_error, error_bitword);
+        tpc_monitor.updateErrorBitWord(ErrorBits::disk_full, error_bitword);
+        tpc_monitor.updateErrorBitWord(ErrorBits::disk_failover, error_bitword);
 
         // If the PCIe cards are not initialized we cannot query the hardware.
         // Just set the board status words to 0x0

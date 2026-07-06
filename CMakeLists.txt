@@ -62,6 +62,7 @@ endif()
 include_directories(/usr/include)
 include_directories(networking
                     src/control
+                    src/data
                     src/hardware
                     src/status
                     lib/pcie_driver
@@ -185,7 +186,7 @@ install(TARGETS daq_orchestrator DESTINATION /usr/local/bin)
 # Refactored Daemon
 add_executable(orchestrator daemon/orchestrator.cpp)
 
-target_include_directories(orchestrator PRIVATE ${SYSTEMD_INCLUDE_DIRS})
+target_include_directories(orchestrator PRIVATE ${SYSTEMD_INCLUDE_DIRS} src/data)
 target_link_libraries(orchestrator PRIVATE ${SYSTEMD_LIBRARIES})
 
 target_compile_definitions(orchestrator PUBLIC

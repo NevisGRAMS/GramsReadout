@@ -13,6 +13,8 @@
 
 #include "json.hpp"
 #include "../../lib/folly/ProducerConsumerQueue.h"
+#include <mutex>
+#include <vector>
 
 
 namespace data_handler {
@@ -32,6 +34,7 @@ public:
     void SetRun(bool set_running) { is_running_.store(set_running); }
     std::map<std::string, size_t> GetMetrics();
     uint32_t getRunErrorCode() { return run_error_bit_.load(); }
+    bool DiskStopRequested() const { return disk_stop_requested_.load(std::memory_order_relaxed); }
 
 private:
     trig_ctrl::TriggerControl trigger_{};
@@ -48,6 +51,12 @@ private:
     bool SetRecvBuffer(pcie_int::PCIeInterface *pcie_interface,
         pcie_int::DMABufferHandle *pbuf_rec1, pcie_int::DMABufferHandle *pbuf_rec2, bool is_data);
     bool SwitchWriteFile();
+    bool MaybeSwitchDataDisk();
+    void RequestDiskStop();
+    void InitNvmePathsFromEnv();
+    void AppendStorageSegmentLog(const std::string& reason);
+    std::string BuildTriggerRawFileName(const std::string& basedir, size_t segment_file_num) const;
+    std::string BuildPpsFileName(const std::string& basedir, size_t segment_file_num) const;
     void PollTriggerPPS(pcie_int::PCIeInterface *pcie_interface);
 
     static bool isEventStart(const uint32_t word) { return (word & 0xFFFFFFFF) == 0xFFFFFFFF; }
@@ -134,6 +143,11 @@ private:
     std::atomic_bool failed_locking_dma_buffers_;
     std::atomic_bool trigger_file_open_error_;
     std::atomic_bool pps_file_open_error_;
+    std::atomic_bool disk_full_;
+    std::atomic_bool disk_failover_;
+    std::atomic_bool disk_stop_requested_;
+    std::atomic_bool disk_switch_requested_;
+    std::atomic<size_t> trigger_segment_file_num_{0};
 
     std::atomic_bool read_write_buff_overflow_;
 
@@ -142,6 +156,9 @@ private:
 
     std::string data_basedir_;
     std::string write_file_name_;
+    std::vector<std::string> data_nvme_paths_;
+    size_t active_nvme_index_{0};
+    std::mutex data_basedir_mutex_;
     std::atomic<size_t> file_count_;
 
     std::atomic_bool is_running_;

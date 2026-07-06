@@ -3,6 +3,7 @@
 //
 
 #include "controller.h"
+#include "storage_utils.h"
 #include "quill/LogMacros.h"
 #include "quill/Frontend.h"
 #include "quill/sinks/ConsoleSink.h"
@@ -152,6 +153,58 @@ namespace controller {
         return read_write_success;
     }
 
+    bool Controller::SelectNvmeDataDirForRun() {
+        if (storage_utils::PickMaxFreeEnabled()) {
+            const auto disk_pick = storage_utils::SelectNvmeDataDir(
+                true, storage_utils::kDiskRunStartMinFreeBytes);
+            if (!disk_pick.ok) {
+                LOG_ERROR(logger_,
+                    "Insufficient NVMe space to configure run {} (best free={} GiB, need {} GiB)",
+                    run_id_, disk_pick.free_bytes / (1024ULL * 1024ULL * 1024ULL),
+                    storage_utils::kDiskRunStartMinFreeBytes / (1024ULL * 1024ULL * 1024ULL));
+                tpc_readout_monitor_.setErrorBitWord(TpcReadoutMonitor::ErrorBits::disk_full);
+                return false;
+            }
+            data_basedir_ = disk_pick.path;
+            storage_utils::WriteDataBaseDirConf(disk_pick.path);
+            LOG_INFO(logger_, "Max-free disk selected: {} (free={} GiB) for run {}",
+                disk_pick.path, disk_pick.free_bytes / (1024ULL * 1024ULL * 1024ULL), run_id_);
+            return true;
+        }
+
+        const auto current_free = storage_utils::GetFreeBytes(data_basedir_);
+        if (current_free.has_value()
+            && *current_free >= storage_utils::kDiskRunStartMinFreeBytes) {
+            return true;
+        }
+
+        const auto candidates = storage_utils::GetNvmeCandidatesFromEnv();
+        if (candidates.size() >= 2) {
+            const auto disk_pick = storage_utils::PickSsd0First(
+                candidates.at(0), candidates.at(1), storage_utils::kDiskRunStartMinFreeBytes);
+            if (!disk_pick.ok) {
+                LOG_ERROR(logger_,
+                    "Insufficient NVMe space for run {} (SSD0-first, best free={} GiB)",
+                    run_id_, disk_pick.free_bytes / (1024ULL * 1024ULL * 1024ULL));
+                tpc_readout_monitor_.setErrorBitWord(TpcReadoutMonitor::ErrorBits::disk_full);
+                return false;
+            }
+            data_basedir_ = disk_pick.path;
+            storage_utils::WriteDataBaseDirConf(disk_pick.path);
+            LOG_INFO(logger_, "SSD0-first fallback disk: {} for run {}", disk_pick.path, run_id_);
+            return true;
+        }
+
+        if (!current_free.has_value()
+            || *current_free < storage_utils::kDiskRunStartMinFreeBytes) {
+            LOG_ERROR(logger_, "Insufficient space on DATA_BASE_DIR {} for run {}",
+                data_basedir_, run_id_);
+            tpc_readout_monitor_.setErrorBitWord(TpcReadoutMonitor::ErrorBits::disk_full);
+            return false;
+        }
+        return true;
+    }
+
     json Controller::LoadConfig(const std::string &config_file) {
         json config;
         std::ifstream f;
@@ -286,6 +339,10 @@ namespace controller {
     bool Controller::Configure(std::vector<uint32_t>& args) {
 
         PersistRunId();
+
+        if (!SelectNvmeDataDirForRun()) {
+            return false;
+        }
 
         if (args.empty()) {
             LOG_ERROR(logger_, "Wrong number of arguments! {}", args.size());
@@ -422,6 +479,7 @@ namespace controller {
 
         while (run_status_) {
             std::this_thread::sleep_for(std::chrono::seconds(2));
+            ApplyPendingRunStop();
             status_->SetDataHandlerStatus(data_handler_.get());
             status_->ReadStatus(tpc_readout_monitor_, board_slots_, pcie_interface_.get(), false);
             if (!print_status_) {
@@ -431,6 +489,27 @@ namespace controller {
                 tpc_readout_monitor_.print();
             }
         }
+    }
+
+    void Controller::ApplyPendingRunStop() {
+        if (current_state_ != State::kRunning) {
+            return;
+        }
+
+        run_stop_coordinator_.Poll(data_handler_.get());
+        if (!run_stop_coordinator_.ShouldStopRun()) {
+            return;
+        }
+
+        const auto reason = run_stop_coordinator_.PendingReason();
+        LOG_WARNING(logger_,
+            "Automatic run stop (reason={}); performing TPC_Stop_Run equivalent \n",
+            static_cast<uint32_t>(reason));
+
+        current_state_ = State::kStopped;
+        StopRun();
+        tpc_readout_monitor_.setReadoutState(static_cast<uint32_t>(current_state_));
+        run_stop_coordinator_.ClearPendingReason();
     }
 
     bool Controller::StartRun() {
