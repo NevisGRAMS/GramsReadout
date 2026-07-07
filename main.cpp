@@ -1,6 +1,7 @@
 #include <iostream>
 #include <ctime>
 #include "src/control/controller.h"
+#include "src/data/mirror_worker.h"
 #include "networking/tcp_protocol.h"
 #include "CommunicationCodes.hh"
 #include "quill/Backend.h"
@@ -128,6 +129,8 @@ int main() {
     ctrl_thread.join();
     io_thread.join();
     status_io_thread.join();
+
+    mirror_worker::Shutdown();
 
     return 0;
 }

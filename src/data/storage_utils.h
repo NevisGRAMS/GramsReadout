@@ -55,6 +55,23 @@ bool AllNvmeDisksBelowMinFree(uint64_t min_free_bytes);
 
 bool WriteDataBaseDirConf(const std::string& path);
 
+// Background SATA mirroring (DATA_MIRROR_ENABLE). When false, mirror helpers are no-ops.
+bool MirrorEnabled();
+
+// DATA_MIRROR_MAX_MBYTES_PER_SEC: max copy rate in MiB/s; 0 = unlimited. Default 150.
+uint64_t MirrorMaxBytesPerSec();
+
+// NVMe mount that contains src_path, or empty if not under a known NVMe root.
+std::string FindNvmeRootForPath(const std::string& src_path);
+
+// Backup root for nvme_index (0=ssd0, 1=ssd1). Single-drive fallback uses any writable backup dir.
+std::optional<std::string> GetBackupRootForNvmeIndex(size_t nvme_index);
+
+// Destination path under backup, preserving NVMe mount name, e.g.
+// /backup_data_sata_ssd1/write_data_nvme_ssd0/readout_data/...
+// Empty when mirroring is disabled or mapping fails.
+std::string MirrorDestinationPath(const std::string& src_path);
+
 } // namespace storage_utils
 
 #endif // STORAGE_UTILS_H

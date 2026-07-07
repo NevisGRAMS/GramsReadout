@@ -3,6 +3,7 @@
 //
 
 #include "data_handler.h"
+#include "mirror_worker.h"
 #include "storage_utils.h"
 #include <unistd.h>
 #include <fcntl.h>
@@ -297,13 +298,15 @@ namespace data_handler {
         // Make sure we copy `fd_` so when we re-assign it later it doesn't affect the thread.
         // Start a thread and detach it so the file closes in the background at its leisure
         // while we continue to write data to the newly opened file.
+        const std::string closed_path = write_file_name_ + std::to_string(file_count_.load()) + ".dat";
         int fd_copy = fd_;
-        std::thread close_thread([&fd_copy, this]() {
+        std::thread close_thread([this, fd_copy, closed_path]() {
             LOG_DEBUG(logger_, "Closing data file {} \n", fd_copy);
             if(close(fd_copy) == -1) {
                 LOG_ERROR(logger_, "Failed to close data file, with error:{} \n", std::string(strerror(errno)));
                 switch_file_close_error_.store(true, std::memory_order_relaxed);
             }
+            mirror_worker::EnqueueClosedFile(closed_path);
         });
         close_thread.detach();
 
@@ -381,6 +384,12 @@ namespace data_handler {
         trigger_thread.join();
         LOG_DEBUG(logger_, "trigger thread joined... \n");
         LOG_INFO(logger_, "Read, Write and Trigger threads joined... \n");
+
+        if (storage_utils::MirrorEnabled()) {
+            const std::string storage_log = data_basedir_ + "/config_logs/run_"
+                                            + std::to_string(run_number_) + "_storage.log";
+            mirror_worker::EnqueueClosedFile(storage_log);
+        }
     }
 
     void DataHandler::FastDataWrite() {
@@ -510,6 +519,7 @@ namespace data_handler {
         else num_recv_bytes += static_cast<size_t>(write_bytes);
 
         LOG_INFO(logger_, "Ended data write and closing file..\n");
+        const std::string closed_path = write_file_name_ + std::to_string(file_count_.load()) + ".dat";
         // Make sure all data is flushed to file before closing
         if(fsync(fd_) == -1) {
             LOG_ERROR(logger_, "Failed to sync data file with error: {} \n", std::string(strerror(errno)));
@@ -517,6 +527,7 @@ namespace data_handler {
         if(close(fd_) == -1) {
             LOG_ERROR(logger_, "Failed to close data file with error: {} \n", std::string(strerror(errno)));
         }
+        mirror_worker::EnqueueClosedFile(closed_path);
 
         LOG_INFO(logger_, "Closed file after writing {}B to file {} \n", num_recv_bytes, write_file_name_);
         LOG_INFO(logger_, "Wrote {} events to {} files \n", event_count_.load(), file_count_.load());
@@ -818,8 +829,8 @@ namespace data_handler {
         std::array<TriggerSample, TRIG_BUFFER_SIZE> trig_sample_buffer{};
 
         LOG_INFO(logger_, "Opening Trigger data files");
-        const std::string trigger_raw_file_name = BuildTriggerRawFileName(data_basedir_, 0);
-        std::ofstream trigger_raw_file(trigger_raw_file_name, std::ios::binary | std::ios::app);
+        std::string trigger_raw_open_path = BuildTriggerRawFileName(data_basedir_, 0);
+        std::ofstream trigger_raw_file(trigger_raw_open_path, std::ios::binary | std::ios::app);
         std::ofstream trigger_file;
         if constexpr (kWriteParsedTriggerSidecar) {
             const std::string trigger_file_name = data_basedir_ + "/trigger_data/trigger_data_"
@@ -836,7 +847,7 @@ namespace data_handler {
             LOG_WARNING(logger_, "Trigger raw file failed to open!");
             trigger_file_open_error_.store(true, std::memory_order_relaxed);
         } else {
-            LOG_INFO(logger_, "Writing raw trigger records to {}", trigger_raw_file_name);
+            LOG_INFO(logger_, "Writing raw trigger records to {}", trigger_raw_open_path);
         }
 
         // 1. Start with initializing 2nd fiber on the PCIe card
@@ -867,6 +878,7 @@ namespace data_handler {
 
         auto reopen_trigger_files = [&]() {
             flush_trigger_buffers();
+            const std::string closed_trigger_path = trigger_raw_open_path;
             if constexpr (kWriteParsedTriggerSidecar) {
                 if (trigger_file.is_open()) {
                     trigger_file.close();
@@ -874,6 +886,9 @@ namespace data_handler {
             }
             if (trigger_raw_file.is_open()) {
                 trigger_raw_file.close();
+            }
+            if (!closed_trigger_path.empty()) {
+                mirror_worker::EnqueueClosedFile(closed_trigger_path);
             }
 
             std::string basedir;
@@ -884,8 +899,8 @@ namespace data_handler {
                 segment_file_num = trigger_segment_file_num_.load(std::memory_order_acquire);
             }
 
-            const std::string trigger_raw_file_name = BuildTriggerRawFileName(basedir, segment_file_num);
-            trigger_raw_file.open(trigger_raw_file_name, std::ios::binary | std::ios::app);
+            trigger_raw_open_path = BuildTriggerRawFileName(basedir, segment_file_num);
+            trigger_raw_file.open(trigger_raw_open_path, std::ios::binary | std::ios::app);
             if constexpr (kWriteParsedTriggerSidecar) {
                 std::string trigger_file_name = basedir + "/trigger_data/trigger_data_"
                                                 + std::to_string(run_number_);
@@ -900,9 +915,9 @@ namespace data_handler {
             }
             if (!trigger_raw_file.is_open()) {
                 trigger_file_open_error_.store(true, std::memory_order_relaxed);
-                LOG_ERROR(logger_, "Failed to reopen trigger raw file on {}", trigger_raw_file_name);
+                LOG_ERROR(logger_, "Failed to reopen trigger raw file on {}", trigger_raw_open_path);
             } else {
-                LOG_INFO(logger_, "Reopened trigger raw file on {}", trigger_raw_file_name);
+                LOG_INFO(logger_, "Reopened trigger raw file on {}", trigger_raw_open_path);
             }
         };
 
@@ -1022,6 +1037,7 @@ namespace data_handler {
             trigger_file.close();
         }
         trigger_raw_file.close();
+        mirror_worker::EnqueueClosedFile(trigger_raw_open_path);
         LOG_INFO(logger_, "Ended Trigger Read {} \n", trig_data_ctr_);
     }
 
@@ -1087,8 +1103,12 @@ namespace data_handler {
                                read_counter * sizeof(PPSSample));
                 read_counter = 0;
             }
+            const std::string closed_pps_path = pps_file_name;
             if (pps_file.is_open()) {
                 pps_file.close();
+            }
+            if (!closed_pps_path.empty()) {
+                mirror_worker::EnqueueClosedFile(closed_pps_path);
             }
 
             std::string basedir;
@@ -1155,7 +1175,9 @@ namespace data_handler {
         if (read_counter > 0) {
             pps_file.write(reinterpret_cast<const char*>(pps_sample_buffer.data()), (read_counter - 1) * sizeof(PPSSample));
         }
+        const std::string closed_pps_path = pps_file_name;
         pps_file.close();
+        mirror_worker::EnqueueClosedFile(closed_pps_path);
         LOG_INFO(logger_, "Closed PPS data file");
     }
 

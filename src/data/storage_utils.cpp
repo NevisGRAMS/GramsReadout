@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <sys/statvfs.h>
+#include <unistd.h>
 
 namespace storage_utils {
 
@@ -12,6 +13,23 @@ namespace {
 
 constexpr const char* kDefaultNvmeSsd0 = "/write_data_nvme_ssd0";
 constexpr const char* kDefaultNvmeSsd1 = "/write_data_nvme_ssd1";
+constexpr const char* kDefaultBackupSsd0 = "/backup_data_sata_ssd0";
+constexpr const char* kDefaultBackupSsd1 = "/backup_data_sata_ssd1";
+
+bool BackupDirWritable(const std::string& path) {
+    if (path.empty()) {
+        return false;
+    }
+    return access(path.c_str(), R_OK | W_OK | X_OK) == 0;
+}
+
+std::string Basename(const std::string& path) {
+    const auto pos = path.find_last_of('/');
+    if (pos == std::string::npos) {
+        return path;
+    }
+    return path.substr(pos + 1);
+}
 
 bool EnvFlagTrue(const char* value, bool default_value) {
     if (value == nullptr) {
@@ -39,6 +57,13 @@ std::string TrimPath(const char* value) {
         path.pop_back();
     }
     return path;
+}
+
+std::string GetBackupDirFromEnv(size_t index) {
+    const char* env_name = (index == 0) ? "DATA_BACKUP0_DIR" : "DATA_BACKUP1_DIR";
+    const char* default_path = (index == 0) ? kDefaultBackupSsd0 : kDefaultBackupSsd1;
+    const std::string trimmed = TrimPath(std::getenv(env_name));
+    return trimmed.empty() ? default_path : trimmed;
 }
 
 } // namespace
@@ -152,6 +177,95 @@ bool WriteDataBaseDirConf(const std::string& path) {
     }
     env_file << "DATA_BASE_DIR=" << path << "\n";
     return true;
+}
+
+bool MirrorEnabled() {
+    return EnvFlagTrue(std::getenv("DATA_MIRROR_ENABLE"), false);
+}
+
+uint64_t MirrorMaxBytesPerSec() {
+    const char* value = std::getenv("DATA_MIRROR_MAX_MBYTES_PER_SEC");
+    if (value == nullptr) {
+        return 150ULL * 1024ULL * 1024ULL;
+    }
+    char* end = nullptr;
+    const unsigned long long parsed = std::strtoull(value, &end, 10);
+    if (end == value) {
+        return 150ULL * 1024ULL * 1024ULL;
+    }
+    return static_cast<uint64_t>(parsed) * 1024ULL * 1024ULL;
+}
+
+std::string FindNvmeRootForPath(const std::string& src_path) {
+    for (const auto& nvme_root : GetNvmeCandidatesFromEnv()) {
+        if (src_path.size() < nvme_root.size()) {
+            continue;
+        }
+        if (src_path.compare(0, nvme_root.size(), nvme_root) != 0) {
+            continue;
+        }
+        if (src_path.size() == nvme_root.size() || src_path[nvme_root.size()] == '/') {
+            return nvme_root;
+        }
+    }
+    return {};
+}
+
+std::optional<std::string> GetBackupRootForNvmeIndex(size_t nvme_index) {
+    const std::string backup0 = GetBackupDirFromEnv(0);
+    const std::string backup1 = GetBackupDirFromEnv(1);
+
+    if (nvme_index == 0 && BackupDirWritable(backup0)) {
+        return backup0;
+    }
+    if (nvme_index == 1 && BackupDirWritable(backup1)) {
+        return backup1;
+    }
+
+    // Temporary single-drive fallback: use whichever backup mount exists.
+    if (BackupDirWritable(backup1)) {
+        return backup1;
+    }
+    if (BackupDirWritable(backup0)) {
+        return backup0;
+    }
+    return std::nullopt;
+}
+
+std::string MirrorDestinationPath(const std::string& src_path) {
+    if (!MirrorEnabled()) {
+        return {};
+    }
+
+    const std::string nvme_root = FindNvmeRootForPath(src_path);
+    if (nvme_root.empty()) {
+        return {};
+    }
+
+    const auto nvme_candidates = GetNvmeCandidatesFromEnv();
+    size_t nvme_index = 0;
+    for (size_t i = 0; i < nvme_candidates.size(); ++i) {
+        if (nvme_candidates[i] == nvme_root) {
+            nvme_index = i;
+            break;
+        }
+    }
+
+    const auto backup_root = GetBackupRootForNvmeIndex(nvme_index);
+    if (!backup_root.has_value()) {
+        return {};
+    }
+
+    std::string rel_path;
+    if (src_path.size() > nvme_root.size()) {
+        rel_path = src_path.substr(nvme_root.size() + 1);
+    }
+
+    std::string dst = *backup_root + "/" + Basename(nvme_root);
+    if (!rel_path.empty()) {
+        dst += "/" + rel_path;
+    }
+    return dst;
 }
 
 } // namespace storage_utils
