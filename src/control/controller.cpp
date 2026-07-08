@@ -3,7 +3,6 @@
 //
 
 #include "controller.h"
-#include "mirror_worker.h"
 #include "storage_utils.h"
 #include "quill/LogMacros.h"
 #include "quill/Frontend.h"
@@ -70,6 +69,7 @@ namespace controller {
         status_thread_ = std::thread(&Controller::StatusControl, this);
 
         LOG_INFO(logger_, "Initialized Controller \n");
+        storage_utils::TryStartMirrorDaemon();
     }
 
     Controller::~Controller() {
@@ -397,7 +397,6 @@ namespace controller {
             // Dump the JSON object to the file with indentation for readability
             outputFile << std::setw(4) << config_ << std::endl;
             outputFile.close();
-            mirror_worker::EnqueueClosedFile(filename);
         }
 
         // Set the basedir for the data

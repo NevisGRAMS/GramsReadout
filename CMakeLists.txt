@@ -218,6 +218,19 @@ target_link_libraries(tpc_daq PRIVATE
 message("Installing TPC DAQ")
 install(TARGETS tpc_daq DESTINATION /usr/local/bin)
 
+## Data Mirror Daemon
+add_executable(data_mirror daemon/data_mirror.cpp
+        daemon/mirror_engine.cpp
+        src/data/storage_utils.cpp)
+
+target_include_directories(data_mirror PRIVATE src/data daemon)
+target_compile_definitions(data_mirror PUBLIC
+        -DQUILL_COMPILE_ACTIVE_LOG_LEVEL=QUILL_COMPILE_ACTIVE_LOG_LEVEL_INFO)
+target_link_libraries(data_mirror PRIVATE quill::quill pthread)
+
+message("Installing Data Mirror Daemon")
+install(TARGETS data_mirror DESTINATION /usr/local/bin)
+
 ## Data Monitor
 add_executable(data_monitor daemon/data_monitor.cpp
         ${DATAMONITOR_CM_SRC}

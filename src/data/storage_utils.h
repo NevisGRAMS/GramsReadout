@@ -55,9 +55,6 @@ bool AllNvmeDisksBelowMinFree(uint64_t min_free_bytes);
 
 bool WriteDataBaseDirConf(const std::string& path);
 
-// Background SATA mirroring (DATA_MIRROR_ENABLE). When false, mirror helpers are no-ops.
-bool MirrorEnabled();
-
 // DATA_MIRROR_MAX_MBYTES_PER_SEC: max copy rate in MiB/s; 0 = unlimited. Default 150.
 uint64_t MirrorMaxBytesPerSec();
 
@@ -67,10 +64,26 @@ std::string FindNvmeRootForPath(const std::string& src_path);
 // Backup root for nvme_index (0=ssd0, 1=ssd1). Single-drive fallback uses any writable backup dir.
 std::optional<std::string> GetBackupRootForNvmeIndex(size_t nvme_index);
 
+// Minimum free space on backup before accepting a mirror copy (~1 GiB headroom).
+constexpr uint64_t kMirrorMinBackupFreeBytes = 1ULL * 1024ULL * 1024ULL * 1024ULL;
+
+// NVMe index (0/1) for src_path.
+size_t NvmeIndexForPath(const std::string& src_path);
+
+// Pick a writable backup root with enough free space. Tries mapped drive first, then fallback.
+std::optional<std::string> SelectBackupRootForCopy(size_t nvme_index, uint64_t file_size_bytes);
+
+// Build destination path under a specific backup root (preserves NVMe mount name).
+std::string MirrorDestinationPathToRoot(const std::string& src_path, const std::string& backup_root);
+
 // Destination path under backup, preserving NVMe mount name, e.g.
 // /backup_data_sata_ssd1/write_data_nvme_ssd0/readout_data/...
-// Empty when mirroring is disabled or mapping fails.
+// Empty when no backup with sufficient space is available.
 std::string MirrorDestinationPath(const std::string& src_path);
+
+// DATA_MIRROR_ENABLE: when true, GramsReadout/tpc_daq starts the data_mirror systemd service on startup.
+bool MirrorDaemonStartRequested();
+void TryStartMirrorDaemon();
 
 } // namespace storage_utils
 

@@ -35,10 +35,6 @@ Environment="DATA_SSD1_DIR=/write_data_nvme_ssd1"
 Environment="DATA_SSD2_DIR=" 
 # 0 = legacy SSD0-first at run start; 1 = pick NVMe with most free space
 Environment="DATA_PICK_MAX_FREE=0"
-Environment="DATA_MIRROR_ENABLE=0"
-Environment="DATA_MIRROR_MAX_MBYTES_PER_SEC=150"
-Environment="DATA_BACKUP0_DIR=/backup_data_sata_ssd0"
-Environment="DATA_BACKUP1_DIR=/backup_data_sata_ssd1"
 
 # Restart behavior
 Restart=on-failure

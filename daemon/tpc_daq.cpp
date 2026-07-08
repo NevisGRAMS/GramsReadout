@@ -3,7 +3,6 @@
 //
 
 #include "controller.h"
-#include "mirror_worker.h"
 #include "tcp_protocol.h"
 #include "CommunicationCodes.hh"
 
@@ -276,8 +275,6 @@ int main() {
 
     // The last thing, free the pointer
     if (tpc_daq) { tpc_daq.reset(nullptr); }
-
-    mirror_worker::Shutdown();
 
     // Quill backend shutdown happens automatically at exit.
     QUILL_LOG_INFO(logger, "Shutdown sequence complete. Exiting...");

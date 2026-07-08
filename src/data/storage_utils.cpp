@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <fstream>
+#include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <unistd.h>
 
@@ -179,10 +180,6 @@ bool WriteDataBaseDirConf(const std::string& path) {
     return true;
 }
 
-bool MirrorEnabled() {
-    return EnvFlagTrue(std::getenv("DATA_MIRROR_ENABLE"), false);
-}
-
 uint64_t MirrorMaxBytesPerSec() {
     const char* value = std::getenv("DATA_MIRROR_MAX_MBYTES_PER_SEC");
     if (value == nullptr) {
@@ -211,6 +208,20 @@ std::string FindNvmeRootForPath(const std::string& src_path) {
     return {};
 }
 
+size_t NvmeIndexForPath(const std::string& src_path) {
+    const std::string nvme_root = FindNvmeRootForPath(src_path);
+    if (nvme_root.empty()) {
+        return 0;
+    }
+    const auto nvme_candidates = GetNvmeCandidatesFromEnv();
+    for (size_t i = 0; i < nvme_candidates.size(); ++i) {
+        if (nvme_candidates[i] == nvme_root) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 std::optional<std::string> GetBackupRootForNvmeIndex(size_t nvme_index) {
     const std::string backup0 = GetBackupDirFromEnv(0);
     const std::string backup1 = GetBackupDirFromEnv(1);
@@ -232,27 +243,35 @@ std::optional<std::string> GetBackupRootForNvmeIndex(size_t nvme_index) {
     return std::nullopt;
 }
 
-std::string MirrorDestinationPath(const std::string& src_path) {
-    if (!MirrorEnabled()) {
-        return {};
+bool BackupHasSpaceFor(const std::string& backup_root, uint64_t file_size_bytes) {
+    if (!BackupDirWritable(backup_root)) {
+        return false;
     }
+    const auto free_bytes = GetFreeBytes(backup_root);
+    if (!free_bytes.has_value()) {
+        return false;
+    }
+    return *free_bytes >= kMirrorMinBackupFreeBytes + file_size_bytes;
+}
 
+std::optional<std::string> SelectBackupRootForCopy(size_t nvme_index, uint64_t file_size_bytes) {
+    const std::string backup0 = GetBackupDirFromEnv(0);
+    const std::string backup1 = GetBackupDirFromEnv(1);
+    const std::string& primary = (nvme_index == 0) ? backup0 : backup1;
+    const std::string& secondary = (nvme_index == 0) ? backup1 : backup0;
+
+    if (BackupHasSpaceFor(primary, file_size_bytes)) {
+        return primary;
+    }
+    if (primary != secondary && BackupHasSpaceFor(secondary, file_size_bytes)) {
+        return secondary;
+    }
+    return std::nullopt;
+}
+
+std::string MirrorDestinationPathToRoot(const std::string& src_path, const std::string& backup_root) {
     const std::string nvme_root = FindNvmeRootForPath(src_path);
-    if (nvme_root.empty()) {
-        return {};
-    }
-
-    const auto nvme_candidates = GetNvmeCandidatesFromEnv();
-    size_t nvme_index = 0;
-    for (size_t i = 0; i < nvme_candidates.size(); ++i) {
-        if (nvme_candidates[i] == nvme_root) {
-            nvme_index = i;
-            break;
-        }
-    }
-
-    const auto backup_root = GetBackupRootForNvmeIndex(nvme_index);
-    if (!backup_root.has_value()) {
+    if (nvme_root.empty() || backup_root.empty()) {
         return {};
     }
 
@@ -261,11 +280,40 @@ std::string MirrorDestinationPath(const std::string& src_path) {
         rel_path = src_path.substr(nvme_root.size() + 1);
     }
 
-    std::string dst = *backup_root + "/" + Basename(nvme_root);
+    std::string dst = backup_root + "/" + Basename(nvme_root);
     if (!rel_path.empty()) {
         dst += "/" + rel_path;
     }
     return dst;
+}
+
+std::string MirrorDestinationPath(const std::string& src_path) {
+    struct stat info {};
+    uint64_t file_size = 0;
+    if (stat(src_path.c_str(), &info) == 0 && S_ISREG(info.st_mode)) {
+        file_size = static_cast<uint64_t>(info.st_size);
+    }
+
+    const size_t nvme_index = NvmeIndexForPath(src_path);
+    const auto backup_root = SelectBackupRootForCopy(nvme_index, file_size);
+    if (!backup_root.has_value()) {
+        return {};
+    }
+    return MirrorDestinationPathToRoot(src_path, *backup_root);
+}
+
+bool MirrorDaemonStartRequested() {
+    return EnvFlagTrue(std::getenv("DATA_MIRROR_ENABLE"), false);
+}
+
+void TryStartMirrorDaemon() {
+    if (!MirrorDaemonStartRequested()) {
+        return;
+    }
+    const int rc = std::system("systemctl start data_mirror.service >/dev/null 2>&1");
+    if (rc != 0) {
+        // Non-fatal: binary may not be installed yet.
+    }
 }
 
 } // namespace storage_utils
