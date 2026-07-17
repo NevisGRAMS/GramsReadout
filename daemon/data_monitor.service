@@ -9,7 +9,9 @@ After=network.target network-online.target
 # Our C++ code does not fork/daemonize itself.
 Type=simple
 
-Environment="DATA_BASE_DIR=/data2" 
+Environment="DATA_BASE_DIR=/data2"
+Environment="DATA_SSD0_DIR=/write_data_nvme_ssd0"
+Environment="DATA_SSD1_DIR=/write_data_nvme_ssd1"
 
 # Path to the compiled, installed executable
 ExecStart=/usr/local/bin/data_monitor
