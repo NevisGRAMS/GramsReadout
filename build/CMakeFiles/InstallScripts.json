@@ -1,0 +1,13 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/pgrams/pGRAMSBalloon/GramsReadout/build/cmake_install.cmake",
+		"/home/pgrams/pGRAMSBalloon/GramsReadout/build/quill/cmake_install.cmake",
+		"/home/pgrams/pGRAMSBalloon/GramsReadout/build/lib/pcie_driver/cmake_install.cmake",
+		"/home/pgrams/pGRAMSBalloon/GramsReadout/build/networking/cmake_install.cmake",
+		"/home/pgrams/pGRAMSBalloon/GramsReadout/build/PGramsCommCodec/cmake_install.cmake",
+		"/home/pgrams/pGRAMSBalloon/GramsReadout/build/ReadoutDataMonitor/cmake_install.cmake",
+		"/home/pgrams/pGRAMSBalloon/GramsReadout/build/ReadoutDataMonitor/readout_decoder/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

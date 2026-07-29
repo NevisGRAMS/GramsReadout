@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/pgrams_client.dir/unit_test/client_grams_setup.cpp.o CMakeFiles/pgrams_client.dir/tcp_connection.cpp.o CMakeFiles/pgrams_client.dir/tcp_protocol.cpp.o -o pgrams_client   -L/home/pgrams/WD1630LNX86_64/lib  -Wl,-rpath,/home/pgrams/WD1630LNX86_64/lib -lpthread

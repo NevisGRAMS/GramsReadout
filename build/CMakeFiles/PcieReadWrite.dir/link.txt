@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/PcieReadWrite.dir/tests/pcie_read_write.cpp.o -o PcieReadWrite   -L/home/pgrams/WD1630LNX86_64/lib  -Wl,-rpath,/home/pgrams/WD1630LNX86_64/lib lib/pcie_driver/libpcie_lib.a -no-pie -lwdapi1630 -lpthread -m64

@@ -1,0 +1,6 @@
+/usr/local/./libraw_decoder.a
+/usr/local/bin/daq_orchestrator
+/usr/local/bin/orchestrator
+/usr/local/bin/tpc_daq
+/usr/local/bin/data_monitor
+/usr/local/bin/tof_daq

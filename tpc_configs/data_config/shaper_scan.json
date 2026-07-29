@@ -1,0 +1,47 @@
+{
+  "light_fem" : {
+    "cosmic_summed_adc_thresh" : 30,
+    "cosmic_multiplicity" : 1,
+    "pmt_beam_delay" : 1,
+    "pmt_delay_0" : 4,
+    "pmt_delay_1" : 12,
+    "pmt_precount" : 2,
+    "pmt_width" : 7,
+    "pmt_window" : 0,
+    "michel_multiplicity" : 100,
+    "michel_summed_adc_thresh" : 500,
+    "beam_multiplicity" : 100,
+    "beam_summed_adc_thresh" : 4095,
+    "pmt_enable_top" : 65535,
+    "pmt_enable_middle" : 65535,
+    "pmt_enable_lower" : 65535,
+    "pmt_blocksize" : 65535,
+    "channel_thresh0" : 30,
+    "channel_thresh1" : 50,
+    "channel_thresh2" : 4095,
+    "channel_thresh3" : 4095,
+    "pmt_gate_size" : 100,
+    "pmt_beam_size" : 100,
+    "sipm_words" : 50,
+    "sipm_deadtime" : 200,
+    "fpga_bitfile": "firmware/pmt_fem/module1x_pmt_64MHz_new_head_07162013.rbf"
+  },
+  "trigger" : {
+    "trigger_source" : "software",
+    "software_trigger_rate_hz" : 500,
+    "dead_time" : 32,
+    "prescale" : [0,0,0,0,0,0,0,0,0],
+    "light_trig_prescale" : 0
+  },
+  "readout_windows" : {
+    "drift_size": 255
+  },
+  "data_handler" : { 
+    "dma_buffer_size_kb": 290,
+    "num_events" : 50000000,
+    "pps_sample_period" : 5,
+    "read_core_id" : 4,
+    "write_core_id" : 6,
+    "enable_metrics" : false
+  }
+}

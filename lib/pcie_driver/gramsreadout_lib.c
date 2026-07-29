@@ -155,7 +155,7 @@ WDC_DEVICE_HANDLE WDC_DIAG_DeviceFindAndOpenSlot(DWORD dwVendorId,
 
     /* Find device */
     // Default to slot 1 (not committing slot number version to maintain compatibility)
-    if (!WDC_DIAG_DeviceFind(dwVendorId, dwDeviceId, &slot))
+    if (!WDC_DIAG_DeviceFind(dwVendorId, dwDeviceId, &slot, slotNumber))
         return NULL;
 
     /* Open a device handle */

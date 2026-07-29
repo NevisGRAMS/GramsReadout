@@ -1,0 +1,41 @@
+file(REMOVE_RECURSE
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/daq_comp_monitor.cpp.o"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/daq_comp_monitor.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/histogram.cpp.o"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/histogram.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_configs.cpp.o"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_configs.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_monitor.cpp.o"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_monitor.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_monitor_charge_event.cpp.o"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_monitor_charge_event.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_monitor_lbw.cpp.o"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_monitor_lbw.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_monitor_light_event.cpp.o"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_monitor_light_event.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_monitor_query.cpp.o"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_monitor_query.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_readout_monitor.cpp.o"
+  "CMakeFiles/Datamonitor.dir/PGramsCommCodec/src/tpc_readout_monitor.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/ReadoutDataMonitor/readout_decoder/src/charge_light_decoder.cpp.o"
+  "CMakeFiles/Datamonitor.dir/ReadoutDataMonitor/readout_decoder/src/charge_light_decoder.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/ReadoutDataMonitor/readout_decoder/src/process_events.cpp.o"
+  "CMakeFiles/Datamonitor.dir/ReadoutDataMonitor/readout_decoder/src/process_events.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/ReadoutDataMonitor/src/common/data_monitor.cpp.o"
+  "CMakeFiles/Datamonitor.dir/ReadoutDataMonitor/src/common/data_monitor.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/ReadoutDataMonitor/src/monitor_algs/charge_algs.cpp.o"
+  "CMakeFiles/Datamonitor.dir/ReadoutDataMonitor/src/monitor_algs/charge_algs.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/ReadoutDataMonitor/src/monitor_algs/light_algs.cpp.o"
+  "CMakeFiles/Datamonitor.dir/ReadoutDataMonitor/src/monitor_algs/light_algs.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/networking/tcp_connection.cpp.o"
+  "CMakeFiles/Datamonitor.dir/networking/tcp_connection.cpp.o.d"
+  "CMakeFiles/Datamonitor.dir/networking/tcp_protocol.cpp.o"
+  "CMakeFiles/Datamonitor.dir/networking/tcp_protocol.cpp.o.d"
+  "libDatamonitor.a"
+  "libDatamonitor.pdb"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/Datamonitor.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

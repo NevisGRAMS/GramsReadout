@@ -1,0 +1,520 @@
+{
+	"artifacts" : 
+	[
+		{
+			"path" : "daq_orchestrator"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_executable",
+			"install",
+			"link_directories",
+			"target_link_directories",
+			"target_link_libraries",
+			"set_property",
+			"find_package",
+			"boost_find_component",
+			"add_compile_options",
+			"target_compile_definitions",
+			"include_directories",
+			"target_include_directories"
+		],
+		"files" : 
+		[
+			"CMakeLists.txt",
+			"lib/pcie_driver/CMakeLists.txt",
+			"/home/pgrams/tof_readout/software/boost_1_89_0/lib/cmake/boost_python-1.89.0/boost_python-config.cmake",
+			"/home/pgrams/tof_readout/software/boost_1_89_0/lib/cmake/Boost-1.89.0/BoostConfig.cmake",
+			"/home/pgrams/.cache/JetBrains/RemoteDev/dist/502145600b195_CLion-2024.3.5/bin/cmake/linux/x64/share/cmake-3.30/Modules/FindBoost.cmake"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 151,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 182,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 77,
+				"parent" : 0
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 163,
+				"parent" : 0
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 170,
+				"parent" : 0
+			},
+			{
+				"file" : 1
+			},
+			{
+				"command" : 4,
+				"file" : 1,
+				"line" : 91,
+				"parent" : 6
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 144,
+				"parent" : 0
+			},
+			{
+				"command" : 4,
+				"file" : 0,
+				"line" : 145,
+				"parent" : 0
+			},
+			{
+				"command" : 6,
+				"file" : 0,
+				"line" : 15,
+				"parent" : 0
+			},
+			{
+				"file" : 4,
+				"parent" : 10
+			},
+			{
+				"command" : 6,
+				"file" : 4,
+				"line" : 610,
+				"parent" : 11
+			},
+			{
+				"file" : 3,
+				"parent" : 12
+			},
+			{
+				"command" : 7,
+				"file" : 3,
+				"line" : 262,
+				"parent" : 13
+			},
+			{
+				"command" : 6,
+				"file" : 3,
+				"line" : 141,
+				"parent" : 14
+			},
+			{
+				"file" : 2,
+				"parent" : 15
+			},
+			{
+				"command" : 5,
+				"file" : 2,
+				"line" : 103,
+				"parent" : 16
+			},
+			{
+				"command" : 5,
+				"file" : 2,
+				"line" : 103,
+				"parent" : 16
+			},
+			{
+				"command" : 8,
+				"file" : 0,
+				"line" : 9,
+				"parent" : 0
+			},
+			{
+				"command" : 9,
+				"file" : 0,
+				"line" : 167,
+				"parent" : 0
+			},
+			{
+				"command" : 10,
+				"file" : 0,
+				"line" : 45,
+				"parent" : 0
+			},
+			{
+				"command" : 10,
+				"file" : 0,
+				"line" : 57,
+				"parent" : 0
+			},
+			{
+				"command" : 10,
+				"file" : 0,
+				"line" : 63,
+				"parent" : 0
+			},
+			{
+				"command" : 11,
+				"file" : 0,
+				"line" : 153,
+				"parent" : 0
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "-g -std=gnu++17 -fdiagnostics-color=always"
+				},
+				{
+					"backtrace" : 19,
+					"fragment" : "-Wall"
+				},
+				{
+					"backtrace" : 19,
+					"fragment" : "-Wextra"
+				},
+				{
+					"backtrace" : 19,
+					"fragment" : "-pedantic"
+				}
+			],
+			"defines" : 
+			[
+				{
+					"backtrace" : 5,
+					"define" : "BOOST_CONTAINER_DYN_LINK"
+				},
+				{
+					"backtrace" : 5,
+					"define" : "BOOST_CONTAINER_NO_LIB"
+				},
+				{
+					"backtrace" : 5,
+					"define" : "BOOST_GRAPH_DYN_LINK"
+				},
+				{
+					"backtrace" : 5,
+					"define" : "BOOST_GRAPH_NO_LIB"
+				},
+				{
+					"backtrace" : 5,
+					"define" : "BOOST_PYTHON_DYN_LINK"
+				},
+				{
+					"backtrace" : 5,
+					"define" : "BOOST_PYTHON_NO_LIB"
+				},
+				{
+					"backtrace" : 5,
+					"define" : "BOOST_REGEX_DYN_LINK"
+				},
+				{
+					"backtrace" : 5,
+					"define" : "BOOST_REGEX_NO_LIB"
+				},
+				{
+					"backtrace" : 5,
+					"define" : "KP_GRAMSREADOUT_DRIVER_NAME=\"KP_PGRAMS\""
+				},
+				{
+					"backtrace" : 20,
+					"define" : "QUILL_COMPILE_ACTIVE_LOG_LEVEL=QUILL_COMPILE_ACTIVE_LOG_LEVEL_INFO"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"backtrace" : 21,
+					"path" : "/include"
+				},
+				{
+					"backtrace" : 22,
+					"path" : "/home/pgrams/asio-1.30.2/include"
+				},
+				{
+					"backtrace" : 23,
+					"path" : "/home/pgrams/pGRAMSBalloon/GramsReadout/networking"
+				},
+				{
+					"backtrace" : 23,
+					"path" : "/home/pgrams/pGRAMSBalloon/GramsReadout/src/control"
+				},
+				{
+					"backtrace" : 23,
+					"path" : "/home/pgrams/pGRAMSBalloon/GramsReadout/src/hardware"
+				},
+				{
+					"backtrace" : 23,
+					"path" : "/home/pgrams/pGRAMSBalloon/GramsReadout/src/status"
+				},
+				{
+					"backtrace" : 23,
+					"path" : "/home/pgrams/pGRAMSBalloon/GramsReadout/lib/pcie_driver"
+				},
+				{
+					"backtrace" : 23,
+					"path" : "/home/pgrams/pGRAMSBalloon/GramsReadout/lib/folly"
+				},
+				{
+					"backtrace" : 23,
+					"path" : "/home/pgrams/pGRAMSBalloon/GramsReadout/lib/nlohmann_json"
+				},
+				{
+					"backtrace" : 23,
+					"path" : "/home/pgrams/pGRAMSBalloon/GramsReadout/PGramsCommCodec/include"
+				},
+				{
+					"backtrace" : 23,
+					"path" : "/home/pgrams/pGRAMSBalloon/GramsReadout/ReadoutDataMonitor/src/common"
+				},
+				{
+					"backtrace" : 23,
+					"path" : "/home/pgrams/pGRAMSBalloon/GramsReadout/ReadoutDataMonitor/src/monitor_algs"
+				},
+				{
+					"backtrace" : 23,
+					"path" : "/home/pgrams/pGRAMSBalloon/GramsReadout/ReadoutDataMonitor/readout_decoder/src"
+				},
+				{
+					"backtrace" : 23,
+					"path" : "/home/pgrams/WD1630LNX86_64/include"
+				},
+				{
+					"backtrace" : 24,
+					"path" : "/home/pgrams/tof_readout/dev/grams-tof-library/00build/00install/include"
+				},
+				{
+					"backtrace" : 24,
+					"path" : "/home/pgrams/tof_readout/dev/grams-tof-library/00build/00install/include/FlightOps"
+				},
+				{
+					"backtrace" : 24,
+					"path" : "/home/pgrams/tof_readout/dev/grams-tof-library/00build/00install/include/daqd"
+				},
+				{
+					"backtrace" : 24,
+					"path" : "/home/pgrams/tof_readout/dev/grams-tof-library/00build/00install/include/base"
+				},
+				{
+					"backtrace" : 24,
+					"path" : "/home/pgrams/tof_readout/dev/grams-tof-library/00build/00install/include/rawdata"
+				},
+				{
+					"backtrace" : 24,
+					"path" : "/home/pgrams/tof_readout/dev/grams-tof-library/00build/00install/include/scripts_c"
+				},
+				{
+					"backtrace" : 24,
+					"path" : "/home/pgrams/tof_readout/dev/grams-tof-library/00build/00install/include/shota"
+				},
+				{
+					"backtrace" : 5,
+					"path" : "/home/pgrams/pGRAMSBalloon/GramsReadout/quill/include"
+				},
+				{
+					"backtrace" : 24,
+					"isSystem" : true,
+					"path" : "/home/pgrams/tof_readout/software/boost_1_89_0/include"
+				}
+			],
+			"language" : "CXX",
+			"languageStandard" : 
+			{
+				"backtraces" : 
+				[
+					1
+				],
+				"standard" : "17"
+			},
+			"sourceIndexes" : 
+			[
+				0
+			]
+		}
+	],
+	"dependencies" : 
+	[
+		{
+			"backtrace" : 5,
+			"id" : "gramsreadout::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 5,
+			"id" : "Datamonitor::@6890427a1f51a3e7e1df"
+		},
+		{
+			"backtrace" : 5,
+			"id" : "quill::@dac2e6a622d83e63145a"
+		},
+		{
+			"backtrace" : 5,
+			"id" : "pcie_lib::@732d060a5713fa457116"
+		},
+		{
+			"backtrace" : 5,
+			"id" : "datamon_core::@dc3b007eb7f873d833eb"
+		}
+	],
+	"id" : "daq_orchestrator::@6890427a1f51a3e7e1df",
+	"install" : 
+	{
+		"destinations" : 
+		[
+			{
+				"backtrace" : 2,
+				"path" : "/usr/local/bin"
+			}
+		],
+		"prefix" : 
+		{
+			"path" : "/usr/local"
+		}
+	},
+	"link" : 
+	{
+		"commandFragments" : 
+		[
+			{
+				"fragment" : "-g",
+				"role" : "flags"
+			},
+			{
+				"fragment" : "",
+				"role" : "flags"
+			},
+			{
+				"backtrace" : 3,
+				"fragment" : "-L/home/pgrams/WD1630LNX86_64/lib",
+				"role" : "libraryPath"
+			},
+			{
+				"backtrace" : 4,
+				"fragment" : "-L/home/pgrams/tof_readout/dev/grams-tof-library/00build/00install/lib",
+				"role" : "libraryPath"
+			},
+			{
+				"fragment" : "-Wl,-rpath,/home/pgrams/WD1630LNX86_64/lib:/home/pgrams/tof_readout/dev/grams-tof-library/00build/00install/lib:/home/pgrams/pGRAMSBalloon/GramsReadout/cmake-build-debug/PGramsCommCodec:",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 5,
+				"fragment" : "libgramsreadout.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 5,
+				"fragment" : "libDatamonitor.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 5,
+				"fragment" : "lib/pcie_driver/libpcie_lib.a",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 5,
+				"fragment" : "-lstatgrab",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 5,
+				"fragment" : "-lGramsTofFlightOpsLib",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 5,
+				"fragment" : "/home/pgrams/tof_readout/software/boost_1_89_0/lib/libboost_python313.so.1.89.0",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 5,
+				"fragment" : "/home/pgrams/tof_readout/software/boost_1_89_0/lib/libboost_regex.so.1.89.0",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 7,
+				"fragment" : "-no-pie",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 7,
+				"fragment" : "-lwdapi1630",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 7,
+				"fragment" : "-lpthread",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 7,
+				"fragment" : "-m64",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 8,
+				"fragment" : "PGramsCommCodec/libdatamon_core.so",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 9,
+				"fragment" : "-lpthread",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 17,
+				"fragment" : "/home/pgrams/tof_readout/software/boost_1_89_0/lib/libboost_container.so.1.89.0",
+				"role" : "libraries"
+			},
+			{
+				"backtrace" : 18,
+				"fragment" : "/home/pgrams/tof_readout/software/boost_1_89_0/lib/libboost_graph.so.1.89.0",
+				"role" : "libraries"
+			}
+		],
+		"language" : "CXX"
+	},
+	"name" : "daq_orchestrator",
+	"nameOnDisk" : "daq_orchestrator",
+	"paths" : 
+	{
+		"build" : ".",
+		"source" : "."
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				0
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "daemon/daq_orchestrator.cpp",
+			"sourceGroupIndex" : 0
+		}
+	],
+	"type" : "EXECUTABLE"
+}

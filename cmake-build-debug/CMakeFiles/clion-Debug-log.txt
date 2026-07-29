@@ -1,0 +1,76 @@
+/home/pgrams/.cache/JetBrains/RemoteDev/dist/502145600b195_CLion-2024.3.5/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/home/pgrams/.cache/JetBrains/RemoteDev/dist/502145600b195_CLion-2024.3.5/bin/ninja/linux/x64/ninja -G Ninja -S /home/pgrams/pGRAMSBalloon/GramsReadout -B /home/pgrams/pGRAMSBalloon/GramsReadout/cmake-build-debug
+-- The C compiler identification is GNU 9.4.0
+-- The CXX compiler identification is GNU 9.4.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found PkgConfig: /usr/bin/pkg-config (found version "0.29.1")
+-- Checking for module 'libzmq'
+--   Found libzmq, version 4.3.2
+-- Checking for module 'libsystemd'
+--   Found libsystemd, version 245
+CMake Warning (dev) at CMakeLists.txt:15 (find_package):
+  Policy CMP0144 is not set: find_package uses upper-case <PACKAGENAME>_ROOT
+  variables.  Run "cmake --help-policy CMP0144" for policy details.  Use the
+  cmake_policy command to set the policy and suppress this warning.
+
+  Environment variable BOOST_ROOT is set to:
+
+    /home/pgrams/tof_readout/software/boost_1_89_0
+
+  For compatibility, find_package is ignoring the variable, but code in a
+  .cmake module might still use it.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at CMakeLists.txt:15 (find_package):
+  Policy CMP0167 is not set: The FindBoost module is removed.  Run "cmake
+  --help-policy CMP0167" for policy details.  Use the cmake_policy command to
+  set the policy and suppress this warning.
+
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- Found Boost: /home/pgrams/tof_readout/software/boost_1_89_0/lib/cmake/Boost-1.89.0/BoostConfig.cmake (found version "1.89.0") found components: python3 regex
+-- Using TOF library install dir: /home/pgrams/tof_readout/dev/grams-tof-library/00build/00install
+-- Using Windriver include dir: /home/pgrams/WD1630LNX86_64/include
+-- Using Windriver lib dir: /home/pgrams/WD1630LNX86_64/lib
+-- Found primary Communication Code definitions: /include
+-- [GramsReadout] Found ASIO: /home/pgrams/asio-1.30.2/include
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - found
+-- Found Threads: TRUE
+-- QUILL_NO_EXCEPTIONS: OFF
+-- QUILL_NO_THREAD_NAME_SUPPORT: OFF
+-- QUILL_X86ARCH: OFF
+-- QUILL_DISABLE_NON_PREFIXED_MACROS: OFF
+-- QUILL_ENABLE_INSTALL: OFF
+-- WD_BASEDIR set to: /home/pgrams/WD1630LNX86_64
+-- Setting Windriver kernel module name to: KP_PGRAMS
+Compiling for CPU x86_64
+-- [networking] Found ASIO: /home/pgrams/asio-1.30.2/include
+-- Compiling Client
+-- Compiling Server
+-- Compiling pGRAMS Client
+-- Compiling pGRAMS Server
+-- SET PYTHON TO OFF
+SET PYTHON TO FALSE
+Compiling decoder without python..
+Installed raw_decoder!
+Installing DAQ Orchestrator
+Installing Orchestrator
+Installing TPC DAQ
+Installing Data Monitor
+Installing TOF DAQ
+-- Configuring done (0.5s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/pgrams/pGRAMSBalloon/GramsReadout/cmake-build-debug

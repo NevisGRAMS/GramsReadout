@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/config.schema.json",
+  "title": "Setup Schema",
+  "description": "Schema for configs tied to a setup and likely not to change.",
+  "type": "object",
+  "properties": {
+    "crate" : {
+      "type": "object",
+      "properties": {
+        "xmit_slot": { "type": "integer" },
+        "last_light_slot": { "type": "integer", "description": "Last Light slot (closest to XMIT)" },
+        "last_charge_slot": { "type": "integer", "description": "Last Charge slot (farthest from XMIT)" },
+        "light_fem_slot": { "type": "integer" },
+        "charge_fem_slot": { "type": "integer", "description": "Charge FEM slot closest to XMIT" },
+        "trig_slot": { "type": "integer" },
+        "shaper_slot": { "type": "integer" }
+      },
+      "required": ["xmit_slot", "last_light_slot", "last_charge_slot", "light_fem_slot", "charge_fem_slot", "trig_slot", "shaper_slot"]
+    },
+    "data_handler" : {
+      "type": "object",
+      "properties": {
+        "num_events" : { "type": "integer" },
+        "enable_metrics" : { "type" : "boolean" }
+      },
+      "required": ["num_events"]
+    },
+    "xmit" : {
+      "type": "object",
+      "properties": {
+        "fpga_bitfile" : { "type" :  "string" }
+      },
+      "required": ["fpga_bitfile"]
+    },
+    "controller" : {
+      "type": "object",
+      "properties": {
+        "print_status" : { "type" : "boolean" },
+        "enable_monitoring" : { "type" : "boolean" },
+        "log_to_file" : { "type" : "boolean" }
+      },
+      "required": ["print_status", "enable_monitoring", "log_to_file"]
+    },
+    "charge_fem" : {
+      "type": "object",
+      "properties": {
+        "fpga_bitfile" : { "type" : "string" }
+      },
+      "required": ["fpga_bitfile"]
+    }
+  },
+  "required": ["crate", "readout_windows"]
+  }

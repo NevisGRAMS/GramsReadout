@@ -1,0 +1,2 @@
+/usr/bin/ar qc libpcie_lib.a CMakeFiles/pcie_lib.dir/gramsreadout_lib.c.o CMakeFiles/pcie_lib.dir/home/pgrams/WD1630LNX86_64/samples/c/shared/diag_lib.c.o CMakeFiles/pcie_lib.dir/home/pgrams/WD1630LNX86_64/samples/c/shared/wdc_diag_lib.c.o CMakeFiles/pcie_lib.dir/home/pgrams/WD1630LNX86_64/samples/c/shared/wds_diag_lib.c.o CMakeFiles/pcie_lib.dir/home/pgrams/WD1630LNX86_64/samples/c/shared/pci_menus_common.c.o CMakeFiles/pcie_lib.dir/pcie_interface.cpp.o
+/usr/bin/ranlib libpcie_lib.a

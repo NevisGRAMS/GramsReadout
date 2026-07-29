@@ -1,0 +1,399 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1,
+						2,
+						3,
+						4,
+						5
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-45805eea771690ce72bb.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.15"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						1,
+						2,
+						5,
+						6,
+						7,
+						9,
+						10,
+						17,
+						18
+					]
+				},
+				{
+					"build" : "quill",
+					"jsonFile" : "directory-quill-Debug-4013437a2838f23a43bc.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.8"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 1,
+					"source" : "quill",
+					"targetIndexes" : 
+					[
+						14
+					]
+				},
+				{
+					"build" : "lib/pcie_driver",
+					"jsonFile" : "directory-lib.pcie_driver-Debug-41c061472a8c70ac9bfb.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 2,
+					"source" : "lib/pcie_driver",
+					"targetIndexes" : 
+					[
+						11
+					]
+				},
+				{
+					"build" : "networking",
+					"jsonFile" : "directory-networking-Debug-0db5934ee4125b615bbb.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.15"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 3,
+					"source" : "networking",
+					"targetIndexes" : 
+					[
+						3,
+						4,
+						12,
+						13
+					]
+				},
+				{
+					"build" : "PGramsCommCodec",
+					"jsonFile" : "directory-PGramsCommCodec-Debug-65ff4c9af4ba874b74a0.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.15"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 4,
+					"source" : "PGramsCommCodec",
+					"targetIndexes" : 
+					[
+						8
+					]
+				},
+				{
+					"build" : "ReadoutDataMonitor",
+					"childIndexes" : 
+					[
+						6
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-ReadoutDataMonitor-Debug-cb83af800d6b88c52a35.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.15"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 5,
+					"source" : "ReadoutDataMonitor",
+					"targetIndexes" : 
+					[
+						0
+					]
+				},
+				{
+					"build" : "ReadoutDataMonitor/readout_decoder",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-ReadoutDataMonitor.readout_decoder-Debug-35d6ab17c40e63f93eab.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.15"
+					},
+					"parentIndex" : 5,
+					"projectIndex" : 6,
+					"source" : "ReadoutDataMonitor/readout_decoder",
+					"targetIndexes" : 
+					[
+						15,
+						16
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"childIndexes" : 
+					[
+						1,
+						2,
+						3,
+						4,
+						5
+					],
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "GramsReadout",
+					"targetIndexes" : 
+					[
+						1,
+						2,
+						5,
+						6,
+						7,
+						9,
+						10,
+						17,
+						18
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						1
+					],
+					"name" : "quill",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						14
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						2
+					],
+					"name" : "pcie_lib",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						11
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						3
+					],
+					"name" : "GramsNetworkConnection",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						3,
+						4,
+						12,
+						13
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						4
+					],
+					"name" : "DataMonProject",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						8
+					]
+				},
+				{
+					"childIndexes" : 
+					[
+						6
+					],
+					"directoryIndexes" : 
+					[
+						5
+					],
+					"name" : "ReadoutDataMonitor",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						0
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						6
+					],
+					"name" : "raw_decoder",
+					"parentIndex" : 5,
+					"targetIndexes" : 
+					[
+						15,
+						16
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 5,
+					"id" : "DataMonitor::@1ff9da7d88234b974efe",
+					"jsonFile" : "target-DataMonitor-Debug-2f59a9ad6be2782e3d12.json",
+					"name" : "DataMonitor",
+					"projectIndex" : 5
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "Datamonitor::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-Datamonitor-Debug-4576ff1a9b1ea42eff6e.json",
+					"name" : "Datamonitor",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "GramsReadout::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-GramsReadout-Debug-ac5c1bfeee888b31f2d0.json",
+					"name" : "GramsReadout",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "GramsReadoutClient::@5888a6d7873135925b2f",
+					"jsonFile" : "target-GramsReadoutClient-Debug-30f9fc60c76bf96a3787.json",
+					"name" : "GramsReadoutClient",
+					"projectIndex" : 3
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "GramsReadoutConnect::@5888a6d7873135925b2f",
+					"jsonFile" : "target-GramsReadoutConnect-Debug-ca9d6c6886288405a4a8.json",
+					"name" : "GramsReadoutConnect",
+					"projectIndex" : 3
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "PcieReadWrite::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-PcieReadWrite-Debug-1ba573a566a59b6f7771.json",
+					"name" : "PcieReadWrite",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "daq_orchestrator::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-daq_orchestrator-Debug-1b3d7553ff1497a2b505.json",
+					"name" : "daq_orchestrator",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "data_monitor::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-data_monitor-Debug-048aab3d7ff63bf84d63.json",
+					"name" : "data_monitor",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 4,
+					"id" : "datamon_core::@dc3b007eb7f873d833eb",
+					"jsonFile" : "target-datamon_core-Debug-ef50ccb525a063511081.json",
+					"name" : "datamon_core",
+					"projectIndex" : 4
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "gramsreadout::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-gramsreadout-Debug-b7d6e432112c4993cee7.json",
+					"name" : "gramsreadout",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "orchestrator::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-orchestrator-Debug-966abe2b919a9e7ac6da.json",
+					"name" : "orchestrator",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 2,
+					"id" : "pcie_lib::@732d060a5713fa457116",
+					"jsonFile" : "target-pcie_lib-Debug-20a0d29c84cde2a70f89.json",
+					"name" : "pcie_lib",
+					"projectIndex" : 2
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "pgrams_client::@5888a6d7873135925b2f",
+					"jsonFile" : "target-pgrams_client-Debug-8c8cb2176bf2d1e5f347.json",
+					"name" : "pgrams_client",
+					"projectIndex" : 3
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "pgrams_server::@5888a6d7873135925b2f",
+					"jsonFile" : "target-pgrams_server-Debug-701af2ee5526610a614a.json",
+					"name" : "pgrams_server",
+					"projectIndex" : 3
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "quill::@dac2e6a622d83e63145a",
+					"jsonFile" : "target-quill-Debug-bca6e67d569dc4b09c80.json",
+					"name" : "quill",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 6,
+					"id" : "raw_decoder::@904bc36597b2715820b3",
+					"jsonFile" : "target-raw_decoder-Debug-8516fa613c0aecc4dcb8.json",
+					"name" : "raw_decoder",
+					"projectIndex" : 6
+				},
+				{
+					"directoryIndex" : 6,
+					"id" : "run_raw_decoder::@904bc36597b2715820b3",
+					"jsonFile" : "target-run_raw_decoder-Debug-69f951b9f02d41ce74c4.json",
+					"name" : "run_raw_decoder",
+					"projectIndex" : 6
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "tof_daq::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-tof_daq-Debug-246b2512f24b142a003c.json",
+					"name" : "tof_daq",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "tpc_daq::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-tpc_daq-Debug-cb712eacffaeff2226a6.json",
+					"name" : "tpc_daq",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/pgrams/pGRAMSBalloon/GramsReadout/cmake-build-debug",
+		"source" : "/home/pgrams/pGRAMSBalloon/GramsReadout"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 7
+	}
+}

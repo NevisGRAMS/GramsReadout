@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/orchestrator.dir/daemon/orchestrator.cpp.o -o orchestrator   -L/home/pgrams/WD1630LNX86_64/lib  -Wl,-rpath,/home/pgrams/WD1630LNX86_64/lib: -lsystemd libgramsreadout.a -lstatgrab -lsystemd -lstatgrab lib/pcie_driver/libpcie_lib.a -no-pie -lwdapi1630 -lpthread -m64

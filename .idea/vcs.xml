@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/PGramsCommCodec" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/PGramsCommCodec/extern/pybind11" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ReadoutDataMonitor" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ReadoutDataMonitor/readout_decoder" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/ReadoutDataMonitor/readout_decoder/extern/pybind11" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/networking" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/networking/extern/pybind11" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/quill" vcs="Git" />
+  </component>
+</project>

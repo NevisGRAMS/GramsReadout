@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/GramsReadoutConnect.dir/server.cpp.o CMakeFiles/GramsReadoutConnect.dir/tcp_connection.cpp.o CMakeFiles/GramsReadoutConnect.dir/tcp_protocol.cpp.o -o GramsReadoutConnect   -L/home/pgrams/WD1630LNX86_64/lib  -Wl,-rpath,/home/pgrams/WD1630LNX86_64/lib -lpthread

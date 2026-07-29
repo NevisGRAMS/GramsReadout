@@ -1,0 +1,25 @@
+{
+  "light_fem" : {
+    "summed_peak_thresh" : 500,
+    "channel_multiplicity" : 100,
+    "roi_delay_0" : 4,
+    "roi_delay_1" : 12,
+    "roi_precount" : 2,
+    "roi_peak_window" : 7,
+    "enable_top" : 0,
+    "enable_middle" : 0,
+    "enable_lower" : 65535,
+    "fifo_blocksize" : 65535,
+    "disc_threshold_0" : 10,
+    "disc_threshold_1" : 250,
+    "num_roi_words" : 30,
+    "roi_deadtime" : 240
+  },
+  "trigger" : {
+    "trigger_source" : 1,
+    "software_trigger_rate_hz" : 100,
+    "tpc_dead_time" : 1,
+    "prescale" : [0,0,0,0,0,0,0,0,0],
+    "light_trig_prescale" : 0
+  }
+}

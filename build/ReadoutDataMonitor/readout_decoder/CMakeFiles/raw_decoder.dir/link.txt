@@ -1,0 +1,2 @@
+/usr/bin/ar qc libraw_decoder.a CMakeFiles/raw_decoder.dir/src/process_events.cpp.o CMakeFiles/raw_decoder.dir/src/charge_light_decoder.cpp.o
+/usr/bin/ranlib libraw_decoder.a
