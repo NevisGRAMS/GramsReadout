@@ -227,7 +227,7 @@ namespace data_handler {
         if (segment_file_num > 0) {
             name += "_" + std::to_string(segment_file_num);
         }
-        return name + ".csv";
+        return name + ".bin";
     }
 
     void DataHandler::RequestDiskStop() {
@@ -1065,7 +1065,12 @@ namespace data_handler {
         std::array<uint32_t, 2> read_array{};
         uint32_t *psend = send_array.data();
         uint32_t *precv = read_array.data();
-        size_t previous_pps_sample = 0;
+        // Reg 35 (mb_trig_rd_gps) latches the board's 2 MHz timestamp (ts = frame*(drift_size+1)
+        // + sample) on each PPS edge and holds it until the next edge. Record one record per
+        // change of the latched value: a real 1 Hz PPS advances ts by ~2e6 ticks/s.
+        const uint64_t kFrameSpan = static_cast<uint64_t>(drift_size_) + 1; // 2 MHz ticks per frame
+        uint64_t last_ts = 0;       // last latched timestamp seen
+        bool have_last = false;
         // PPS register query and data structure
         size_t num_status_words = 2;
         uint32_t chip_num = 3;
@@ -1126,24 +1131,41 @@ namespace data_handler {
             pcie_interface->PCIeSendBuffer(1, 0, 1, psend);
             pcie_interface->PCIeRecvBuffer(1, 0, 2, num_status_words, 0, precv);
 
-            uint32_t pps_frame = read_array.at(0) & 0xFFFFFF;
+            const uint32_t raw_word0 = read_array.at(0);
+            uint32_t pps_frame = raw_word0 & 0xFFFFFF;
             uint32_t pps_sample = read_array.at(1) & 0xFFF;
             uint32_t pps_div = ( ( read_array.at(1) & 0x70000) >> 16 );
-            // Add samples to buffer
-            if (pps_frame > 0) {
-                // Calculate the 2MHz timestamp and skip the sample if it has not increased
-                uint32_t run_pps_sample = pps_frame * drift_size_ + pps_sample;
-                if (run_pps_sample <= previous_pps_sample) continue;
-                //LOG_INFO(logger_, "Sample period {} Read Counter {}", pps_sample_period_, read_counter);
-                pps_sample_buffer[read_counter].timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                                         std::chrono::system_clock::now().time_since_epoch()).count();
-                pps_sample_buffer[read_counter].pps_frame = pps_frame;
-                pps_sample_buffer[read_counter].pps_sample = pps_sample;
-                pps_sample_buffer[read_counter].pps_div = pps_div;
-                read_counter++;
-                previous_pps_sample = run_pps_sample;
-                pps_count_++;
+            // Drop reads contaminated by another PCIe user: because a send+recv pair is not atomic
+            // across threads, the status-monitor thread's board-status reply can leak in here
+            // (e.g. 0x7ff68014). A valid reg-35 reply uses only the low 24 bits, so any upper byte
+            // means a bad read.
+            if ((raw_word0 & 0xFF000000) != 0) {
+                continue;
             }
+            if (pps_frame == 0) {
+                continue;
+            }
+
+            const uint64_t ts = static_cast<uint64_t>(pps_frame) * kFrameSpan + pps_sample;
+
+            if (!have_last) {
+                last_ts = ts;           // first read only sets a reference, not counted
+                have_last = true;
+                continue;
+            }
+
+            if (ts == last_ts) {
+                continue;               // latch unchanged -> still the same PPS
+            }
+            last_ts = ts;
+
+            pps_sample_buffer[read_counter].timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                     std::chrono::system_clock::now().time_since_epoch()).count();
+            pps_sample_buffer[read_counter].pps_frame = pps_frame;
+            pps_sample_buffer[read_counter].pps_sample = pps_sample;
+            pps_sample_buffer[read_counter].pps_div = pps_div;
+            read_counter++;
+            pps_count_++;
 
             if (read_counter >= PPS_BUFFER_SIZE) {
                 pps_file.write(reinterpret_cast<const char*>(pps_sample_buffer.data()),
@@ -1154,7 +1176,7 @@ namespace data_handler {
 
         // If there are any samples in the buffer, write them and close file
         if (read_counter > 0) {
-            pps_file.write(reinterpret_cast<const char*>(pps_sample_buffer.data()), (read_counter - 1) * sizeof(PPSSample));
+            pps_file.write(reinterpret_cast<const char*>(pps_sample_buffer.data()), read_counter * sizeof(PPSSample));
         }
         pps_file.close();
         LOG_INFO(logger_, "Closed PPS data file");
