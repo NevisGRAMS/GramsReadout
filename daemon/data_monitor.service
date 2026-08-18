@@ -12,6 +12,9 @@ Type=simple
 Environment="DATA_BASE_DIR=/data2"
 Environment="DATA_SSD0_DIR=/write_data_nvme_ssd0"
 Environment="DATA_SSD1_DIR=/write_data_nvme_ssd1"
+# 1 (default): count EventErrorBit on sampled LBW events and append error_bit_words to 0x4001.
+# 0: old 0x4001 layout (no error_bit_words). For ground-compat testing before flight.
+Environment="LBW_ERROR_BIT_COUNTS=1"
 
 # Path to the compiled, installed executable
 ExecStart=/usr/local/bin/data_monitor
