@@ -597,14 +597,16 @@ void DAQHandler(std::shared_ptr<TCPConnection> &command_client_ptr, std::shared_
                 break;
             }
             case to_u16(CommunicationCodes::ORC_Boot_All_DAQ): {
+                // ToF writes to TOFDATA, not the TPC NVMe pick. Always try tof_daq even if
+                // AutoSelectDataDir fails (that gate is only for TPC + data_monitor).
                 if (AutoSelectDataDir(logger)) {
                     ControlService(kTpcDaq, kStartUnit, logger);
-                    ControlService(kTofDaq, kStartUnit, logger);
                     ControlService(kDataMonitor, kStartUnit, logger);
-                    QUILL_LOG_INFO(logger, "Booted All DAQ...");
                 } else {
-                    QUILL_LOG_ERROR(logger, "Skipped Boot All DAQ due to data disk selection failure \n");
+                    QUILL_LOG_ERROR(logger, "Skipped Boot TPC/Monitor due to data disk selection failure \n");
                 }
+                ControlService(kTofDaq, kStartUnit, logger);
+                QUILL_LOG_INFO(logger, "Booted All DAQ...");
                 break;
             }
             case to_u16(CommunicationCodes::ORC_Shutdown_All_DAQ): {
@@ -728,6 +730,9 @@ void DAQHandler(std::shared_ptr<TCPConnection> &command_client_ptr, std::shared_
                 QUILL_LOG_WARNING(logger, "Unknown command {}", cmd.command);
                 break;
             }
+        }
+        if (cmd.command != to_u16(CommunicationCodes::COM_HeartBeat)) {
+            g_daq_monitor.setLastCommand(cmd.command);
         }
     }
 
