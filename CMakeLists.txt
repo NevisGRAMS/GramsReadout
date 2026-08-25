@@ -35,17 +35,21 @@ else()
     message(FATAL_ERROR "WD_BASEDIR environment variable not set!")
 endif()
 
-# The Communication code definitions, use the shared one but fall back to local copy if shared is not found
+# CommunicationCodes.hh:
+#   Primary: pGRAMSBalloon/include (set BALLOON_BASE_DIR) — overrides the copy below.
+#   Fallback copy: GramsReadout/PGramsCommCodec/comm_codes (local standalone builds).
 set(PRIMARY_COMM_CODES "$ENV{BALLOON_BASE_DIR}/include")
-set(FALLBACK_COMM_CODES "$ENV{TPC_DAQ_BASEDIR}/PGramsCommCodec/comm_codes")
-
-# Check if the primary file exists on the file system
-if(DEFINED PRIMARY_COMM_CODES)
-    message(STATUS "Found primary Communication Code definitions: ${PRIMARY_COMM_CODES}")
+set(FALLBACK_COMM_CODES "${CMAKE_CURRENT_SOURCE_DIR}/PGramsCommCodec/comm_codes")
+if(EXISTS "${PRIMARY_COMM_CODES}/CommunicationCodes.hh")
+    message(STATUS "Using CommunicationCodes.hh from pGRAMSBalloon: ${PRIMARY_COMM_CODES}")
     include_directories("${PRIMARY_COMM_CODES}")
-else()
-    message(STATUS "Primary Communication Code definitions not found, falling back to local copy: ${FALLBACK_COMM_CODES}")
+elseif(EXISTS "${FALLBACK_COMM_CODES}/CommunicationCodes.hh")
+    message(STATUS "pGRAMSBalloon header not found; using GramsReadout copy: ${FALLBACK_COMM_CODES}")
     include_directories("${FALLBACK_COMM_CODES}")
+else()
+    message(FATAL_ERROR
+        "CommunicationCodes.hh not found. Set BALLOON_BASE_DIR or keep "
+        "PGramsCommCodec/comm_codes/CommunicationCodes.hh")
 endif()
 
 file(GLOB ASIO_SEARCH_CUSTOM_PATH "$ENV{HOME}/asio*/include")
