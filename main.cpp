@@ -3,6 +3,7 @@
 #include "src/control/controller.h"
 #include "networking/tcp_protocol.h"
 #include "CommunicationCodes.hh"
+#include "daemon/hub_ip.h"
 #include "quill/Backend.h"
 #include "quill/Frontend.h"
 #include "quill/LogMacros.h"
@@ -98,8 +99,7 @@ int main() {
     asio::io_context status_io_context;
 
     bool run = true;
-    std::string ip_addr = "192.168.1.100";
-    //std::string ip_addr = "127.0.0.1";
+    std::string ip_addr = HubIp();
     std::cout << "Starting controller..." << std::endl;
     controller::Controller controller(io_context, status_io_context, ip_addr, 50003, 50002, false, run);
     // controller::Controller controller(io_context, "127.0.0.1", 12345, true, run);

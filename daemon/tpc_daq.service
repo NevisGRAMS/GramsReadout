@@ -17,6 +17,7 @@ Environment="DATA_SSD0_DIR=/write_data_nvme_ssd0"
 Environment="DATA_SSD1_DIR=/write_data_nvme_ssd1"
 Environment="DATA_PICK_MAX_FREE=0"
 Environment="DATA_MIRROR_ENABLE=0"
+EnvironmentFile=-/etc/grams/hub.conf
 
 # Path to the compiled, installed executable
 ExecStart=/usr/local/bin/tpc_daq

@@ -5,6 +5,7 @@
 #include "controller.h"
 #include "tcp_protocol.h"
 #include "CommunicationCodes.hh"
+#include "hub_ip.h"
 
 #include <asio.hpp>
 #include "quill/Backend.h"
@@ -35,7 +36,7 @@
 
 // --- Configuration ---
 
-const char* kHubIp = "127.0.0.1";  // Hub Computer IP
+const char* kHubIp = HubIp();
 const uint16_t kControllerCommandPort = 50003; // TPC Readout software port, for commands
 const uint16_t kControllerStatusPort = 50002; // TPC Readout software port, for status
 

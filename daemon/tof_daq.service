@@ -29,6 +29,7 @@ Environment="PYTHONPATH=/home/sabertooth/pGRAMSBalloon/grams-tof/00build/00insta
 # ==============================================================================
 
 Environment="PYTHONUNBUFFERED=1"
+EnvironmentFile=-/etc/grams/hub.conf
 
 # --- Restart Policy & Logging ---
 Restart=on-failure

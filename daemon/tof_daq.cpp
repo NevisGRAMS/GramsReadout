@@ -4,6 +4,7 @@
 //
 
 #include "CommunicationCodes.hh"
+#include "hub_ip.h"
 #include "FlightOps/GRAMS_TOF_DAQController.h"
 #include "FlightOps/GRAMS_TOF_EventClient.h"
 #include "FlightOps/GRAMS_TOF_LogCodec.h"
@@ -34,9 +35,7 @@
 #include <regex>
 
 // --- Configuration ---
-//const char* kHubIp = "192.168.100.100"; // Flight computer Hub
-//const char* kHubIp = "192.168.1.100";   // Lab Hub
-const char* kHubIp = "127.0.0.1";         // DummyHub / local
+const char* kHubIp = HubIp();
 constexpr uint16_t kTofCommandPort = 50007;
 constexpr uint16_t kTofStatusPort = 50006;
 

@@ -6,6 +6,7 @@
 #include "tcp_protocol.h"
 #include "daq_comp_monitor.h"
 #include "CommunicationCodes.hh"
+#include "hub_ip.h"
 #include "data_monitor.h"
 
 #include <asio.hpp>
@@ -37,7 +38,7 @@
 
 // --- Configuration ---
 
-const char* kHubIp = "127.0.0.1";  // Hub Computer IP
+const char* kHubIp = HubIp();
 const uint16_t kMonitorCommandPort = 50005; // Data Monitor software port, for commands
 const uint16_t kMonitorStatusPort = 50004; // Data Monitor software port, for status
 
