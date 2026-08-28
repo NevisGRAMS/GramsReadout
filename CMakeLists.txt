@@ -16,7 +16,7 @@ find_package(Boost REQUIRED COMPONENTS python3 regex)
 
 if(NOT DEFINED ENV{GLIB})
     message(FATAL_ERROR "Environment variable GLIB is not set! Please set it to the TOF library install directory, e.g.:\n"
-                        "  export GLIB=\$HOME/work/source/grams-tof-library/00build/00install")
+                        "  export GLIB=\$HOME/work/source/grams-tof/00build/00install")
 endif()
 
 set(TOFLIB_INSTALL $ENV{GLIB})
