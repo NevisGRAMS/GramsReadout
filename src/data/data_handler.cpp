@@ -150,8 +150,13 @@ namespace data_handler {
             // const size_t subrun = config["data_handler"]["subrun"].get<size_t>();
             run_number_ = config["data_handler"]["subrun"].get<size_t>();
             std::string trig_src = config["trigger"]["trigger_source"].get<std::string>();
-            ext_trig_ = trig_src == "external" || "light" ? 1 : 0;
             software_trig_ = trig_src == "software" ? 1 : 0;
+            const int external_trig = trig_src == "external" ? 1 : 0;
+            const int light_trig = trig_src == "light" ? 1 : 0;
+            // SendStartTrigger/Stop only have software vs "run on" (mb_trig_run).
+            // Light is masked separately in TriggerControl; start/stop still uses the
+            // external path.
+            ext_trig_ = (external_trig || light_trig) ? 1 : 0;
             data_basedir_ = config["data_handler"]["data_basedir"].get<std::string>();
             file_count_.store(0);
             write_file_name_ = data_basedir_ + "/readout_data/pGRAMS_bin_" + std::to_string(run_number_) + "_";
@@ -160,7 +165,8 @@ namespace data_handler {
             write_core_id_ = config["data_handler"]["write_core_id"].get<size_t>();
             drift_size_ = config["readout_windows"]["drift_size"].get<size_t>();
 
-            LOG_INFO(logger_, "Trigger source software [{}] external [{}] \n", software_trig_, ext_trig_);
+            LOG_INFO(logger_, "Trigger source [{}] software [{}] external [{}] light [{}] \n",
+                     trig_src, software_trig_, external_trig, light_trig);
             LOG_DEBUG(logger_, "\t [{}] DMA loops with [{}] 32b words \n", num_dma_loops_, DATABUFFSIZE / 4);
             LOG_INFO(logger_, "\n Writing files: {}", write_file_name_);
             InitNvmePathsFromEnv();
