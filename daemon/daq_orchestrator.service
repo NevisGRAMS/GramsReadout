@@ -15,7 +15,8 @@ Environment="TPC_DAQ_BASEDIR=/home/???/GramsReadout" "DATA_BASE_DIR=/??/data"
 
 # Since we don't have access to environment variables list them here
 # TPC Readout Env Vars
-Environment="TPC_DAQ_BASEDIR=/home/???/GramsReadout" 
+Environment="TPC_DAQ_BASEDIR=/home/???/GramsReadout"
+Environment="WD_BASEDIR=/home/???/WD1630LNX86_64"
 Environment="DATA_BASE_DIR=/data" 
 
 # TOF Readout Env Vars

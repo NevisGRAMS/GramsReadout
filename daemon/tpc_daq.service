@@ -13,6 +13,7 @@ Type=simple
 # TPC Readout Env Vars
 EnvironmentFile=/run_number/data_ssd.conf
 Environment="TPC_DAQ_BASEDIR=/home/???/GramsReadout"
+Environment="WD_BASEDIR=/home/???/WD1630LNX86_64"
 Environment="DATA_SSD0_DIR=/write_data_nvme_ssd0"
 Environment="DATA_SSD1_DIR=/write_data_nvme_ssd1"
 Environment="DATA_PICK_MAX_FREE=0"

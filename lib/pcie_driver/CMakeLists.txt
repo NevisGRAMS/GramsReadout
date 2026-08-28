@@ -76,6 +76,18 @@ set(SRCS
         pcie_interface.h
 )
 
+# Spare WinDriver exposes a 4-arg WDC_DIAG_DeviceFind (slot index);
+# flight WinDriver is 3-arg. Detect from the installed header so the
+# same source builds on both machines.
+file(READ "$ENV{WD_BASEDIR}/samples/c/shared/wdc_diag_lib.h" _WDC_DIAG_HDR)
+if(_WDC_DIAG_HDR MATCHES "WDC_DIAG_DeviceFind\\([^)]*DWORD slot")
+    set(WDC_DIAG_DEVICE_FIND_HAS_SLOT TRUE)
+    message(STATUS "WDC_DIAG_DeviceFind: 4-arg (slot) prototype")
+else()
+    set(WDC_DIAG_DEVICE_FIND_HAS_SLOT FALSE)
+    message(STATUS "WDC_DIAG_DeviceFind: 3-arg prototype")
+endif()
+
 # Create a library target
 add_library(pcie_lib STATIC ${SRCS})
 
@@ -83,6 +95,9 @@ add_library(pcie_lib STATIC ${SRCS})
 target_compile_definitions(pcie_lib
         PUBLIC
         KP_GRAMSREADOUT_DRIVER_NAME="$ENV{WD_KERNEL_MODULE_NAME}")
+if(WDC_DIAG_DEVICE_FIND_HAS_SLOT)
+    target_compile_definitions(pcie_lib PRIVATE WDC_DIAG_DEVICE_FIND_HAS_SLOT)
+endif()
 
 # Set compilation flags for the library
 target_compile_options(pcie_lib PRIVATE ${CFLAGS})

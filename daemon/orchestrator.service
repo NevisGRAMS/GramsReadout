@@ -29,6 +29,7 @@ Group=root
 
 # Add the correct absolute paths here
 Environment="TPC_DAQ_BASEDIR="
+Environment="WD_BASEDIR="
 
 Environment="DATA_SSD0_DIR=/write_data_nvme_ssd0" 
 Environment="DATA_SSD1_DIR=/write_data_nvme_ssd1" 

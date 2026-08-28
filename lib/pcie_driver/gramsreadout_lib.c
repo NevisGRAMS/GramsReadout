@@ -153,10 +153,18 @@ WDC_DEVICE_HANDLE WDC_DIAG_DeviceFindAndOpenSlot(DWORD dwVendorId,
 {
     WD_PCI_SLOT slot;
 
-    /* Find device */
-    // Default to slot 1 (not committing slot number version to maintain compatibility)
+    /* Find device.
+     * Spare WinDriver: 4-arg (vendor, device, slot, slotNumber).
+     * Flight WinDriver: 3-arg (vendor, device, slot). CMake sets
+     * WDC_DIAG_DEVICE_FIND_HAS_SLOT from wdc_diag_lib.h. */
+#ifdef WDC_DIAG_DEVICE_FIND_HAS_SLOT
     if (!WDC_DIAG_DeviceFind(dwVendorId, dwDeviceId, &slot, slotNumber))
         return NULL;
+#else
+    (void)slotNumber;
+    if (!WDC_DIAG_DeviceFind(dwVendorId, dwDeviceId, &slot))
+        return NULL;
+#endif
 
     /* Open a device handle */
     return WDC_DIAG_DeviceOpen(&slot, pcKpName, dwDevCtxSize);
