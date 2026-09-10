@@ -157,6 +157,7 @@ add_executable(daq_orchestrator daemon/daq_orchestrator.cpp)
 
 target_include_directories(daq_orchestrator PRIVATE
         ${TOFLIB_INSTALL}/include
+        ${TOFLIB_INSTALL}/include/Common
         ${TOFLIB_INSTALL}/include/FlightOps
         ${TOFLIB_INSTALL}/include/daqd
         ${TOFLIB_INSTALL}/include/base
@@ -178,6 +179,7 @@ target_link_libraries(daq_orchestrator PRIVATE
         quill::quill
         pcie_lib
         statgrab
+        GramsTofCommonLib
         GramsTofFlightOpsLib
         ${Boost_LIBRARIES}
 )
@@ -259,6 +261,7 @@ add_executable(tof_daq daemon/tof_daq.cpp)
 
 target_include_directories(tof_daq PRIVATE
         ${TOFLIB_INSTALL}/include
+        ${TOFLIB_INSTALL}/include/Common
         ${TOFLIB_INSTALL}/include/FlightOps
         ${TOFLIB_INSTALL}/include/daqd
         ${TOFLIB_INSTALL}/include/base
@@ -272,6 +275,7 @@ target_link_directories(tof_daq PRIVATE
 )
 target_link_libraries(tof_daq PRIVATE
         gramsreadout
+        GramsTofCommonLib
         GramsTofFlightOpsLib
         ${Boost_LIBRARIES}
         quill::quill

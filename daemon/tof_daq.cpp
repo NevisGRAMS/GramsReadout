@@ -19,7 +19,6 @@
 #include <array>
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -28,7 +27,7 @@
 #include <future>
 #include <iostream>
 #include <memory>
-#include <mutex>
+#include <pthread.h>
 #include <string>
 #include <system_error>
 #include <thread>
@@ -45,38 +44,18 @@ using namespace communication;
 using TOF_ControllerPtr = std::unique_ptr<GRAMS_TOF_DAQController>;
 
 std::atomic_bool g_running(true);
-std::condition_variable g_shutdown_cv;
-std::mutex g_shutdown_mutex;
-
-// --- Signal Handling ---
-void SignalHandler(int signum) {
-    if (signum == SIGTERM || signum == SIGINT || signum == SIGHUP) {
-        g_running.store(false);
-        {
-            std::lock_guard<std::mutex> lock(g_shutdown_mutex);
-        }
-        g_shutdown_cv.notify_one();
-    }
-}
 
 void SetupSignalHandlers() {
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGTERM);
+    sigaddset(&set, SIGINT);
+    sigaddset(&set, SIGHUP);
+    pthread_sigmask(SIG_BLOCK, &set, nullptr);
+
     struct sigaction sa{};
-    sa.sa_handler = SignalHandler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-
-    constexpr int signals_to_handle[] = {SIGTERM, SIGINT, SIGHUP};
-    for (int sig : signals_to_handle) {
-        if (sigaction(sig, &sa, nullptr) == -1) {
-            std::cerr << "FATAL: Failed to set signal handler for " << sig << ": " << strerror(errno) << std::endl;
-            exit(EXIT_FAILURE);
-        }
-    }
-
     sa.sa_handler = SIG_IGN;
-    if (sigaction(SIGPIPE, &sa, nullptr) == -1) {
-        std::cerr << "WARNING: Failed to ignore SIGPIPE: " << strerror(errno) << std::endl;
-    }
+    sigaction(SIGPIPE, &sa, nullptr);
 }
 
 // --- Journal Forwarder Thread Class ---
@@ -205,7 +184,7 @@ void StartTofProcess(TOF_ControllerPtr &tof_ptr, std::thread &tof_thread, quill:
 
     GRAMS_TOF_DAQController::Config config;
     config.noFpgaMode = false;
-    //config.noFpgaMode = true;
+    //config.noFpgaMode = true; // Dummy / no-FPGA test only
     config.commandListenPort = kTofCommandPort;
     config.eventTargetPort = kTofStatusPort;
     config.remoteEventHub = kHubIp;
@@ -284,8 +263,16 @@ int main() {
 
     if (pgrams::tofdaq::g_running.load()) {
         QUILL_LOG_INFO(logger, "Service running. Waiting for termination signal...");
-        std::unique_lock<std::mutex> lock(pgrams::tofdaq::g_shutdown_mutex);
-        pgrams::tofdaq::g_shutdown_cv.wait(lock, [] { return !pgrams::tofdaq::g_running.load(); });
+
+        sigset_t wait_set;
+        sigemptyset(&wait_set);
+        sigaddset(&wait_set, SIGTERM);
+        sigaddset(&wait_set, SIGINT);
+        sigaddset(&wait_set, SIGHUP);
+
+        int sig_received = 0;
+        sigwait(&wait_set, &sig_received);
+        pgrams::tofdaq::g_running.store(false);
     } else {
         QUILL_LOG_WARNING(logger, "Initialization error detected. Proceeding directly to cleanup.");
     }
