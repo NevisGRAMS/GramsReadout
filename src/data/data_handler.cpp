@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <cstring>
 #include <chrono>
+#include <thread>
 #include <pthread.h>
 #include <sched.h>
 #include <cstdlib>
@@ -570,6 +571,7 @@ namespace data_handler {
         usleep(500000);
 
         std::thread trigger_thread;
+        size_t dma_recoveries = 0;
         if (software_trig_ == 1) {
             LOG_INFO(logger_, "Starting software trigger thread...\n");
             trigger_thread = std::thread(&trig_ctrl::TriggerControl::SendSoftwareTrigger, &trigger_,
@@ -622,23 +624,28 @@ namespace data_handler {
                 }
 
                 if (!WaitForDma(pcie_interface, &data, kDev2)) {
-                    LOG_WARNING(logger_, " loop [{}] DMA is not finished, aborting...  \n", iv);
-                    pcie_interface->ReadReg64(kDev2,  hw_consts::cs_bar, hw_consts::cs_dma_by_cnt, &u64Data);
-                    pcie_interface->DmaSyncIo(dma_num);
-                    static size_t num_read = (num_dma_byte - (u64Data & 0xffff));
-
-                    LOG_INFO(logger_, "Received {} bytes, writing to file.. \n", num_read);
-
-                    std::memcpy(word_arr.data(), buffp_rec32, num_read);
-                    data_queue_.write(word_arr);
-                    if (data_queue_.isFull()) {
-                        read_write_buff_overflow_.store(true);
-                        num_rw_buffer_overflow_++;
-                        LOG_ERROR(logger_, "Data read/write queue is full! This is unexpected! \n");
+                    if (!is_running_.load()) {
+                        ClearDmaOnAbort(pcie_interface, &u64Data, kDev2);
+                        break;
                     }
+                    pcie_interface->ReadReg64(kDev2,  hw_consts::cs_bar, hw_consts::cs_dma_by_cnt, &u64Data);
+                    const uint64_t remain = u64Data & 0xffffffffULL;
+                    dma_timeout_.store(true, std::memory_order_relaxed);
+                    ++dma_recoveries;
+                    LOG_WARNING(logger_,
+                        "DMA timeout loop [{}] recovery {} remain_bytes={} (0x{:x}); "
+                        "abort + re-init receivers, keep running\n",
+                        iv, dma_recoveries, remain, remain);
+
+                    pcie_interface->DmaSyncIo(dma_num);
                     ClearDmaOnAbort(pcie_interface, &u64Data, kDev2);
-                    // If DMA did not finish, abort loop!
-                    break;
+                    for (size_t rcvr = 1; rcvr < 3; rcvr++) {
+                        r_cs_reg = rcvr == 1 ? hw_consts::r1_cs_reg : hw_consts::r2_cs_reg;
+                        pcie_interface->WriteReg32(kDev2, hw_consts::cs_bar, r_cs_reg, hw_consts::cs_init);
+                    }
+                    is_first_event = true;
+                    // Do not enqueue a short/corrupt DMA block. Next iteration re-arms.
+                    continue;
                 }
                 // sync DMA I/O cache
                 pcie_interface->DmaSyncIo(dma_num);
@@ -684,7 +691,8 @@ namespace data_handler {
             LOG_ERROR(logger_, "Failed freeing DMA buffers! \n");
         }
 
-        LOG_INFO(logger_, "Finished read with {} DMA loops \n", dma_loop_count_.load());
+        LOG_INFO(logger_, "Finished read with {} DMA loops, {} DMA recoveries \n",
+                 dma_loop_count_.load(), dma_recoveries);
     }
 
     void DataHandler::ReadoutViaController(pcie_int::PCIeInterface *pcie_interface, pcie_int::PcieBuffers *buffers) {
@@ -1048,19 +1056,18 @@ namespace data_handler {
     }
 
     bool DataHandler::WaitForDma(pcie_int::PCIeInterface *pcie_interface, uint32_t *data, uint32_t dev_num) {
-        // Poll DMA until finished
-        // Can get stuck waiting for the DMA to finish, use is_running flag check to break from it
-        for (size_t is = 0; is < 6000000000; is++) {
+        constexpr auto kDmaTimeout = std::chrono::milliseconds(2000); // 2 s max timeout for DMA to complete
+        const auto deadline = std::chrono::steady_clock::now() + kDmaTimeout;
+        while (is_running_.load()) {
             pcie_interface->ReadReg32(dev_num, hw_consts::cs_bar, hw_consts::cs_dma_cntrl, data);
             if ((*data & hw_consts::dma_in_progress) == 0) {
                 return true;
             }
-            if ((is > 0) && ((is % 10000000) == 0)) {
-                // Don't care so much about ordering across threads so use relaxed
+            if (std::chrono::steady_clock::now() >= deadline) {
                 dma_timeout_.store(true, std::memory_order_relaxed);
-                std::cout << "Wait iter: " << is << "\n";
+                return false;
             }
-            if (!is_running_.load()) break;
+            std::this_thread::sleep_for(std::chrono::microseconds(50)); // leave time for other threads to run while waiting for DMA
         }
         return false;
     }
