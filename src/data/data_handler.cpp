@@ -165,6 +165,11 @@ namespace data_handler {
             read_core_id_ = config["data_handler"]["read_core_id"].get<size_t>();
             write_core_id_ = config["data_handler"]["write_core_id"].get<size_t>();
             drift_size_ = config["readout_windows"]["drift_size"].get<size_t>();
+            const double abort_wait_s = config["data_handler"].contains("dma_abort_wait_time")
+                ? config["data_handler"]["dma_abort_wait_time"].get<double>()
+                : 2.0;
+            dma_abort_wait_ms_ = static_cast<size_t>(abort_wait_s * 1000.0);
+            LOG_INFO(logger_, "DMA abort wait {} s \n", abort_wait_s);
 
             LOG_INFO(logger_, "Trigger source [{}] software [{}] external [{}] light [{}] \n",
                      trig_src, software_trig_, external_trig, light_trig);
@@ -1098,8 +1103,7 @@ namespace data_handler {
     }
 
     bool DataHandler::WaitForDma(pcie_int::PCIeInterface *pcie_interface, uint32_t *data, uint32_t dev_num) {
-        constexpr auto kDmaTimeout = std::chrono::milliseconds(2000); // 2 s max timeout for DMA to complete
-        const auto deadline = std::chrono::steady_clock::now() + kDmaTimeout;
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(dma_abort_wait_ms_);
         while (is_running_.load()) {
             pcie_interface->ReadReg32(dev_num, hw_consts::cs_bar, hw_consts::cs_dma_cntrl, data);
             if ((*data & hw_consts::dma_in_progress) == 0) {

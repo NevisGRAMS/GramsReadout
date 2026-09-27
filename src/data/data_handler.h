@@ -93,6 +93,9 @@ private:
     // Set this for ~3 event sizes or 900kB DMA buffer equivalent. The config will allocate the DMA buffer
     // and set how much of the ring buffer to use
     size_t DMABUFFSIZE;
+    // How long WaitForDma waits before aborting and re-init. Milliseconds.
+    // Set from data_handler.dma_abort_wait_time (seconds); 2 s if that key is absent.
+    size_t dma_abort_wait_ms_{2000};
     constexpr static size_t EVENTSIZE = 600300; // max expected event size in bytes
     constexpr static size_t DATABUFFSIZE = (EVENTSIZE / sizeof(uint32_t));
     constexpr static size_t EVENTBUFFSIZE = DATABUFFSIZE * EVENTCHUNK; // make it twice the expected charge event size to account for light ROIs
