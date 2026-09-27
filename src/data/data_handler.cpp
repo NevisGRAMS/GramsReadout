@@ -452,9 +452,16 @@ namespace data_handler {
         size_t event_end_count = 0;
         size_t num_recv_bytes = 0;
         size_t local_event_count = 0;
+        // Buffer index where the event currently being built starts. Dropping a partial event
+        // rolls `num_words` back to here, NOT to 0, so the complete (already counted) events
+        // waiting in the same chunk are kept.
+        size_t event_begin = 0;
+        size_t blocks_read = 0;
+        size_t dropped_partial = 0;
         event_count_.store(0);
         event_start_markers_.store(0);
         event_end_markers_.store(0);
+        resync_at_block_.store(kNoResync);
 
         // Dereferencing the pointer in the loop is slow so dereference once before 
         // the loop and use the copy of the raw pointer
@@ -463,20 +470,46 @@ namespace data_handler {
 
         while (!stop_write_.load()) {
             while (data_queue_.read(word_arr)) {
+                // First block after a DMA recovery: the event that was in flight when the DMA
+                // timed out can never be completed. Drop its head and resync on the next start word.
+                if (blocks_read >= resync_at_block_.load(std::memory_order_acquire)) {
+                    resync_at_block_.store(kNoResync, std::memory_order_relaxed);
+                    if (event_start) {
+                        LOG_WARNING(logger_, "DMA recovery resync: dropping {} words of partial event \n",
+                                    num_words - event_begin);
+                        num_words = event_begin;
+                        event_start = false;
+                        dropped_partial++;
+                    }
+                }
+                blocks_read++;
                 for (size_t i = 0; i < (DMABUFFSIZE / 4); i++) {
                     word = word_arr[i];
                     if (num_words >= event_buffer_size) {
+                        // Only the event being built can overflow; roll back to its start so the
+                        // complete events already in the chunk survive, then wait for the next start.
                         LOG_WARNING(logger_, "Unexpectedly large event, dropping it! num_words=[{}] > event buffer size=[{}] \n",
                                     num_words, EVENTBUFFSIZE);
-                        num_words = 0;
+                        num_words = event_begin;
                         event_start = false;
+                        dropped_partial++;
                     }
                     if (isEventStart(word)) {
-                        if (event_start) num_words = 0; // Previous evt didn't finish, drop partial evt data
+                        if (event_start) {
+                            // Previous evt didn't finish, drop only the partial evt data
+                            num_words = event_begin;
+                            dropped_partial++;
+                        }
+                        event_begin = num_words;
                         event_start = true; event_start_count++;
                         event_start_markers_++;
                     }
-                    else if (isEventEnd(word) && event_start) {
+                    else if (!event_start) {
+                        // Outside an event (before the first start, or after a dropped partial):
+                        // nothing here can belong to a complete event, do not let it into the file.
+                        continue;
+                    }
+                    else if (isEventEnd(word)) {
                         event_end_count++; event_start = false;
                         event_end_markers_++;
                         event_chunk++;
@@ -528,7 +561,8 @@ namespace data_handler {
 
         LOG_INFO(logger_, "Closed file after writing {}B to file {} \n", num_recv_bytes, write_file_name_);
         LOG_INFO(logger_, "Wrote {} events to {} files \n", event_count_.load(), file_count_.load());
-        LOG_INFO(logger_, "Counted [{}] start events & [{}] end events \n", event_start_count, event_end_count);
+        LOG_INFO(logger_, "Counted [{}] start events & [{}] end events, dropped [{}] partial events \n",
+                 event_start_count, event_end_count, dropped_partial);
     }
 
     void DataHandler::ReadoutDMARead(pcie_int::PCIeInterface *pcie_interface) {
@@ -572,6 +606,7 @@ namespace data_handler {
 
         std::thread trigger_thread;
         size_t dma_recoveries = 0;
+        size_t blocks_enqueued = 0;
         if (software_trig_ == 1) {
             LOG_INFO(logger_, "Starting software trigger thread...\n");
             trigger_thread = std::thread(&trig_ctrl::TriggerControl::SendSoftwareTrigger, &trigger_,
@@ -644,6 +679,10 @@ namespace data_handler {
                         pcie_interface->WriteReg32(kDev2, hw_consts::cs_bar, r_cs_reg, hw_consts::cs_init);
                     }
                     is_first_event = true;
+                    // Tell the write thread to drop its half-built event when it reaches the
+                    // next block we enqueue (index = blocks_enqueued). Stored before the enqueue,
+                    // so the queue write orders it for the consumer.
+                    resync_at_block_.store(blocks_enqueued, std::memory_order_release);
                     // Do not enqueue a short/corrupt DMA block. Next iteration re-arms.
                     continue;
                 }
@@ -660,11 +699,14 @@ namespace data_handler {
                     LOG_DEBUG(logger_, " Status word for channel 1 after read = 0x{:X}, 0x{:X}", (u64Data >> 32), (u64Data & 0xffff));
                 }
                 std::memcpy(word_arr.data(), buffp_rec32, DMABUFFSIZE);
-                data_queue_.write(word_arr);
-                if (data_queue_.isFull()) {
+                if (data_queue_.write(word_arr)) {
+                    blocks_enqueued++;
+                } else {
+                    // Block lost -> the event spanning it is torn. Make the write thread resync too.
                     read_write_buff_overflow_.store(true);
                     num_rw_buffer_overflow_++;
-                    LOG_ERROR(logger_, "Data read/write queue is full! This is unexpected! \n");
+                    resync_at_block_.store(blocks_enqueued, std::memory_order_release);
+                    LOG_ERROR(logger_, "Data read/write queue is full, dropped a DMA block! This is unexpected! \n");
                 }
             } // end dma loop
             dma_loop_count_++;

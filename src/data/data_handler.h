@@ -151,6 +151,13 @@ private:
 
     std::atomic_bool read_write_buff_overflow_;
 
+    // Read -> write thread resync after a DMA recovery. The read thread stores the index of the
+    // first data block enqueued after `cs_init`; when the write thread reaches that block it drops
+    // any half-built event and skips words until the next 0xFFFFFFFF, so the head of the event
+    // that was cut by the timeout can never be glued to the tail of a later one.
+    static constexpr size_t kNoResync = static_cast<size_t>(-1);
+    std::atomic<size_t> resync_at_block_{kNoResync};
+
     // uint32_t data;
     // static unsigned long long u64Data;
 
