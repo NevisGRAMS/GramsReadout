@@ -54,6 +54,7 @@ const std::string kOrchestrator = "orchestrator.service";
 const std::string kTpcDaq = "tpc_daq.service";
 const std::string kDataMonitor = "data_monitor.service";
 const std::string kTofDaq = "tof_daq.service";
+const std::string kDataMirror = "data_mirror.service";
 const std::string kStartUnit = "StartUnit";
 const std::string kStopUnit = "StopUnit";
 const std::string kRestartUnit = "RestartUnit";
@@ -724,6 +725,12 @@ void DAQHandler(std::shared_ptr<TCPConnection> &command_client_ptr, std::shared_
                 } else {
                    QUILL_LOG_WARNING(logger, "Failed to set DATA_SSD1_DIR environment variable! \n");
                 }
+                break;
+            } case to_u16(CommunicationCodes::ORC_Start_Data_Mirroring): {
+                ControlService(kDataMirror, kStartUnit, logger);
+                break;
+            } case to_u16(CommunicationCodes::ORC_Stop_Data_Mirroring): {
+                ControlService(kDataMirror, kStopUnit, logger);
                 break;
             }
             default: {
