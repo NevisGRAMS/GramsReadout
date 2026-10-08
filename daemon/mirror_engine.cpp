@@ -44,6 +44,15 @@ namespace mirror_engine {
 namespace {
 
 constexpr size_t kInotifyBufferSize = 32 * (sizeof(struct inotify_event) + 256);
+constexpr uint32_t kTofRunId = std::numeric_limits<uint32_t>::max();
+constexpr const char* kWatchSubdirs[] = {
+    "readout_data", "trigger_data", "pps_data", "config_logs", "logs", "tof_data"
+};
+
+bool IsTofPath(const std::string& path) {
+    return path.find("/tof_data/") != std::string::npos
+        || (path.size() >= 9 && path.compare(path.size() - 9, 9, "/tof_data") == 0);
+}
 
 struct FileStat {
     uint64_t size{0};
@@ -61,6 +70,8 @@ struct PendingFile {
     std::string path;
     std::string dst_path;
     FileMeta meta;
+    uint64_t size{0};
+    int64_t mtime{0};
 };
 
 std::atomic<bool> g_running{true};
@@ -216,6 +227,10 @@ bool ParseUintAfter(const std::string& path, size_t offset, uint32_t* value, siz
 FileMeta ParseFileMeta(const std::string& path) {
     FileMeta meta;
     meta.nvme_index = storage_utils::NvmeIndexForPath(path);
+
+    if (IsTofPath(path)) {
+        return meta;
+    }
 
     const auto grams_pos = path.find("pGRAMS_bin_");
     if (grams_pos != std::string::npos) {
@@ -440,7 +455,8 @@ public:
                 return;
             }
             pending_.insert(src_path);
-            run_queues_[meta.run_id].push_back(PendingFile{src_path, dst_path, meta});
+            run_queues_[meta.run_id].push_back(
+                PendingFile{src_path, dst_path, meta, src_stat.size, src_stat.mtime});
         }
         cv_.notify_one();
     }
@@ -494,11 +510,8 @@ public:
     }
 
     void ScanBacklog() {
-        static const char* kSubdirs[] = {
-            "readout_data", "trigger_data", "pps_data", "config_logs", "logs"
-        };
         const auto nvme_roots = storage_utils::GetNvmeCandidatesFromEnv();
-        for (const char* subdir : kSubdirs) {
+        for (const char* subdir : kWatchSubdirs) {
             for (const auto& nvme_root : nvme_roots) {
                 ScanDirectory(nvme_root + "/" + subdir);
             }
@@ -518,13 +531,20 @@ public:
                 continue;
             }
 
-            if (!job->dst_path.empty() && NeedsCopy(job->path, job->dst_path)
-                && CopyFile(job->path, job->dst_path)) {
+            const bool copied = !job->dst_path.empty() && NeedsCopy(job->path, job->dst_path)
+                && CopyFile(job->path, job->dst_path);
+            if (copied) {
                 SaveStateEntry(job->path);
             }
-
             {
                 std::lock_guard<std::mutex> lock(mutex_);
+                if (copied) {
+                    if (job->meta.run_id == kTofRunId) {
+                        tof_copied_bytes_ += job->size;
+                    } else {
+                        tpc_copied_bytes_ += job->size;
+                    }
+                }
                 pending_.erase(job->path);
             }
         }
@@ -539,17 +559,44 @@ public:
             return;
         }
 
-        std::vector<std::string> watch_roots;
-        static const char* kSubdirs[] = {
-            "readout_data", "trigger_data", "pps_data", "config_logs", "logs"
+        std::unordered_map<int, std::string> watch_dirs;
+        std::vector<std::string> recursive_roots;
+        // inotify is not recursive. TPC dirs are flat; tof_data has stg0/stg1/...
+        const auto add_watch = [&](const std::string& dir, bool recurse, auto& self) -> void {
+            const uint32_t mask = IN_CLOSE_WRITE | IN_MOVED_TO | IN_CREATE;
+            const int wd = inotify_add_watch(fd, dir.c_str(), mask);
+            if (wd < 0) {
+                return;
+            }
+            watch_dirs[wd] = dir;
+            if (!recurse) {
+                return;
+            }
+            DIR* listing = opendir(dir.c_str());
+            if (listing == nullptr) {
+                return;
+            }
+            while (const dirent* entry = readdir(listing)) {
+                if (entry->d_name[0] == '.') {
+                    continue;
+                }
+                const std::string child = dir + "/" + entry->d_name;
+                struct stat info {};
+                if (stat(child.c_str(), &info) == 0 && S_ISDIR(info.st_mode)) {
+                    self(child, true, self);
+                }
+            }
+            closedir(listing);
         };
-        for (const char* subdir : kSubdirs) {
+
+        for (const char* subdir : kWatchSubdirs) {
+            const bool recurse = std::strcmp(subdir, "tof_data") == 0;
             for (const auto& nvme_root : storage_utils::GetNvmeCandidatesFromEnv()) {
                 const std::string path = nvme_root + "/" + subdir;
-                const int wd = inotify_add_watch(fd, path.c_str(), IN_CLOSE_WRITE | IN_MOVED_TO);
-                if (wd >= 0) {
-                    watch_roots.emplace_back(path);
+                if (recurse) {
+                    recursive_roots.push_back(path);
                 }
+                add_watch(path, recurse, add_watch);
             }
         }
 
@@ -560,6 +607,9 @@ public:
                 if (errno == EINTR) {
                     continue;
                 }
+                for (const auto& root : recursive_roots) {
+                    add_watch(root, true, add_watch);
+                }
                 std::this_thread::sleep_for(std::chrono::milliseconds(200));
                 continue;
             }
@@ -568,15 +618,25 @@ public:
             while (offset < len) {
                 const auto* event = reinterpret_cast<const struct inotify_event*>(buffer.data() + offset);
                 offset += sizeof(struct inotify_event) + event->len;
-                if (event->len == 0) {
+                if (event->len == 0 || event->name[0] == '.') {
                     continue;
                 }
-                const std::string name(event->name);
-                for (const auto& root : watch_roots) {
-                    if (name.find('/') != std::string::npos) {
-                        continue;
+                const auto watched = watch_dirs.find(event->wd);
+                if (watched == watch_dirs.end()) {
+                    continue;
+                }
+                const std::string full = watched->second + "/" + event->name;
+                struct stat info {};
+                const bool is_dir = (event->mask & IN_ISDIR)
+                    || (stat(full.c_str(), &info) == 0 && S_ISDIR(info.st_mode));
+                if (is_dir) {
+                    if ((event->mask & (IN_CREATE | IN_MOVED_TO)) && IsTofPath(full)) {
+                        add_watch(full, true, add_watch);
                     }
-                    Enqueue(root + "/" + name);
+                    continue;
+                }
+                if (event->mask & (IN_CLOSE_WRITE | IN_MOVED_TO)) {
+                    Enqueue(full);
                 }
             }
         }
@@ -603,18 +663,25 @@ private:
                 return std::nullopt;
             }
             auto& files = it->second;
+            auto better = [&](const PendingFile& a, const PendingFile& b) {
+                if (run_id == kTofRunId) {
+                    return a.mtime < b.mtime
+                        || (a.mtime == b.mtime && a.path < b.path);
+                }
+                return a.meta.priority < b.meta.priority
+                    || (a.meta.priority == b.meta.priority
+                        && a.meta.segment < b.meta.segment)
+                    || (a.meta.priority == b.meta.priority
+                        && a.meta.segment == b.meta.segment
+                        && a.meta.nvme_index < b.meta.nvme_index)
+                    || (a.meta.priority == b.meta.priority
+                        && a.meta.segment == b.meta.segment
+                        && a.meta.nvme_index == b.meta.nvme_index
+                        && a.path < b.path);
+            };
             auto best = files.begin();
             for (auto iter = files.begin(); iter != files.end(); ++iter) {
-                if (iter->meta.priority < best->meta.priority
-                    || (iter->meta.priority == best->meta.priority
-                        && iter->meta.segment < best->meta.segment)
-                    || (iter->meta.priority == best->meta.priority
-                        && iter->meta.segment == best->meta.segment
-                        && iter->meta.nvme_index < best->meta.nvme_index)
-                    || (iter->meta.priority == best->meta.priority
-                        && iter->meta.segment == best->meta.segment
-                        && iter->meta.nvme_index == best->meta.nvme_index
-                        && iter->path < best->path)) {
+                if (better(*iter, *best)) {
                     best = iter;
                 }
             }
@@ -627,6 +694,48 @@ private:
             return job;
         };
 
+        auto has_tpc = [&]() {
+            for (const auto& entry : run_queues_) {
+                if (entry.first != kTofRunId && !entry.second.empty()) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        auto has_tof = [&]() {
+            const auto it = run_queues_.find(kTofRunId);
+            return it != run_queues_.end() && !it->second.empty();
+        };
+        auto pick_tpc = [&]() -> std::optional<PendingFile> {
+            if (active_run_id_.has_value() && *active_run_id_ != kTofRunId) {
+                if (auto job = pick_from_run(*active_run_id_)) {
+                    return job;
+                }
+            }
+            for (const auto& entry : run_queues_) {
+                if (entry.first != kTofRunId && !entry.second.empty()) {
+                    return pick_from_run(entry.first);
+                }
+            }
+            return std::nullopt;
+        };
+
+        const bool tpc_pending = has_tpc();
+        const bool tof_pending = has_tof();
+        if (!tpc_pending || !tof_pending) {
+            tof_copied_bytes_ = 0;
+            tpc_copied_bytes_ = 0;
+        }
+
+        // Both sides pending: split copy time by bytes (one worker, so this is
+        // the bandwidth split). Only one side pending: that side gets everything.
+        if (tpc_pending && tof_pending) {
+            if (tof_copied_bytes_ <= tpc_copied_bytes_) {
+                return pick_from_run(kTofRunId);
+            }
+            return pick_tpc();
+        }
+
         if (active_run_id_.has_value()) {
             if (auto job = pick_from_run(*active_run_id_)) {
                 return job;
@@ -636,7 +745,6 @@ private:
 
         for (auto it = run_queues_.begin(); it != run_queues_.end(); ++it) {
             if (!it->second.empty()) {
-                active_run_id_ = it->first;
                 return pick_from_run(it->first);
             }
         }
@@ -682,6 +790,8 @@ private:
     std::condition_variable cv_;
     std::map<uint32_t, std::vector<PendingFile>> run_queues_;
     std::optional<uint32_t> active_run_id_;
+    uint64_t tpc_copied_bytes_{0};
+    uint64_t tof_copied_bytes_{0};
     std::set<std::string> pending_;
     std::unordered_map<std::string, FileStat> state_;
     bool running_{true};
